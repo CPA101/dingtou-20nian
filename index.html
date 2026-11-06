@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>定投20年</title>
+    <!-- 不加载任何外部字体/资源：页面零外部请求，打开即显示，不受网络环境影响 -->
+    <style>
+      :root {
+        --bg: #f6f5f1;
+        --surface: #ffffff;
+        --surface-2: #efede7;
+        --ink: #1d2422;
+        --ink-soft: #454e4a;
+        --muted: #7a837e;
+        --line: #e0ded4;
+        --accent: #0f766e;
+        --accent-soft: #e2f0ec;
+        --gap: #b3402a;
+        --gap-soft: #f9e9e4;
+        --ndx: #2f6db3;
+        --csi: #bc4636;
+        --gold: #a87c0d;
+        --bar-track: #e7e5db;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #10140f;
+          --surface: #1a1f1a;
+          --surface-2: #232923;
+          --ink: #e9ede7;
+          --ink-soft: #c3cbc0;
+          --muted: #8d968c;
+          --line: #303830;
+          --accent: #34c2ab;
+          --accent-soft: #17332d;
+          --gap: #e07a5f;
+          --gap-soft: #38241e;
+          --ndx: #6ea8e0;
+          --csi: #e07a5f;
+          --gold: #d9ab2e;
+          --bar-track: #2c332c;
+          color-scheme: dark;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+      .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 28px 18px 56px;
+      }
+      /* ---------- header ---------- */
+      header.top { padding: 10px 0 22px; border-bottom: 2px solid var(--ink); }
+      .kicker {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        color: var(--muted); font-size: 13px; margin-bottom: 10px;
+      }
+      .chip {
+        display: inline-block; padding: 1px 9px; border: 1px solid var(--line);
+        border-radius: 999px; background: var(--surface); color: var(--ink-soft);
+        font-size: 12px; white-space: nowrap;
+      }
+      h1 {
+        font-family: "Songti SC", "STSong", "STZhongsong", "SimSun", "Songti TC", serif;
+        font-size: 34px; font-weight: 900; margin: 0 0 8px; letter-spacing: .02em;
+      }
+      .sub { color: var(--ink-soft); margin: 0; font-size: 15px; }
+      .sub b { color: var(--ink); }
+      /* ---------- sections ---------- */
+      section { margin-top: 34px; }
+      h2 {
+        font-family: "Songti SC", "STSong", "STZhongsong", "SimSun", "Songti TC", serif;
+        font-size: 20px; font-weight: 700; margin: 0 0 14px;
+        display: flex; align-items: baseline; gap: 10px;
+      }
+      h2 .hint { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+      /* ---------- overview ---------- */
+      .stats {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      }
+      .stat {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+        padding: 14px 16px 12px;
+      }
+      .stat .label { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+      .stat .value { font-size: 26px; font-weight: 700; line-height: 1.25; }
+      .stat .value small { font-size: 14px; font-weight: 500; color: var(--muted); margin-right: 2px; }
+      .stat.gap .value { color: var(--gap); }
+      .stat.main .value { color: var(--accent); }
+      .progress-wrap { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+      .progress-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; flex-wrap: wrap; }
+      .progress-head b { color: var(--ink); }
+      .track { height: 10px; border-radius: 5px; background: var(--bar-track); overflow: hidden; display: flex; }
+      .track .fill-dingtou { background: var(--accent); height: 100%; }
+      .track .fill-butou { background: var(--gold); height: 100%; }
+      .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 9px; font-size: 12.5px; color: var(--muted); }
+      .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+      /* ---------- index totals ---------- */
+      .idx-rows { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; }
+      .idx-row { display: grid; grid-template-columns: 118px 1fr auto; gap: 12px; align-items: center; padding: 11px 0; }
+      .idx-row + .idx-row { border-top: 1px solid var(--line); }
+      .idx-name { font-weight: 500; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+      .idx-name .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+      .idx-bar { height: 8px; background: var(--bar-track); border-radius: 4px; overflow: hidden; }
+      .idx-bar i { display: block; height: 100%; border-radius: 4px; }
+      .idx-amt { text-align: right; font-weight: 700; }
+      .idx-amt .share { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+      /* ---------- chart ---------- */
+      .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 16px 8px; }
+      .chart-card svg { width: 100%; height: auto; display: block; }
+      /* ---------- month cards ---------- */
+      .month {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        padding: 16px 18px 14px; margin-bottom: 14px;
+      }
+      .month-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+      .month-name { font-family: "Songti SC", "STSong", "STZhongsong", "SimSun", serif; font-size: 19px; font-weight: 700; }
+      .month-name .span-note { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+      .month-gap { font-size: 13.5px; color: var(--muted); white-space: nowrap; }
+      .month-gap b { color: var(--gap); font-size: 17px; margin-left: 4px; }
+      .mini { width: 100%; border-collapse: collapse; font-size: 14px; }
+      .mini th, .mini td { padding: 6px 8px; text-align: right; }
+      .mini th { color: var(--muted); font-weight: 500; font-size: 12.5px; border-bottom: 1px solid var(--line); }
+      .mini th:first-child, .mini td:first-child { text-align: left; padding-left: 2px; }
+      .mini td.total { font-weight: 700; }
+      .mini tr.actual td { border-top: 1px dashed var(--line); }
+      .mini .rowlabel { color: var(--ink-soft); white-space: nowrap; }
+      .mini .notcalc { text-align: center; color: var(--muted); font-size: 12.5px; }
+      .dotcell { white-space: nowrap; }
+      .dotcell .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+      .meta-line {
+        display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 11px; padding-top: 10px;
+        border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-soft);
+      }
+      .meta-line b { color: var(--ink); }
+      .note { margin-top: 8px; font-size: 13px; color: var(--muted); }
+      .note:empty { display: none; }
+      /* ---------- year groups ---------- */
+      .year-group + .year-group { margin-top: 22px; }
+      .year-head {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        font: inherit; text-align: left; cursor: pointer;
+        background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+        padding: 12px 16px; color: var(--ink);
+      }
+      .year-head:hover { border-color: var(--accent); }
+      .year-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      .year-title { font-family: "Songti SC", "STSong", "STZhongsong", "SimSun", serif; font-size: 20px; font-weight: 700; white-space: nowrap; }
+      .year-sum { flex: 1; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+      .year-sum b { color: var(--ink); }
+      .year-sum .ygap { color: var(--gap); }
+      .year-chev { flex: none; color: var(--muted); font-size: 15px; transition: transform .2s ease; }
+      .year-head[aria-expanded="true"] .year-chev { transform: rotate(180deg); }
+      .year-body { padding-top: 14px; }
+      .year-body .month:last-child { margin-bottom: 0; }
+      .year-body[hidden] { display: none; }
+      @media print {
+        .year-body[hidden] { display: block !important; }
+      }
+      /* ---------- footer ---------- */
+      footer {
+        margin-top: 36px; border-top: 1px solid var(--line); padding-top: 16px;
+        font-size: 13px; color: var(--muted);
+      }
+      footer p { margin: 0 0 6px; }
+      /* ---------- calculator ---------- */
+      .calc-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+      .calc-formula {
+        margin: 0 0 16px; background: var(--surface-2); border-radius: 8px;
+        padding: 11px 14px; font-size: 13.5px; color: var(--ink-soft);
+      }
+      .calc-formula b { color: var(--ink); }
+      .calc-top { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+      .calc-total-field { display: block; font-size: 13px; color: var(--muted); }
+      .calc-input {
+        display: block; width: 100%; margin-top: 5px; padding: 9px 11px;
+        font: inherit; font-size: 15px; color: var(--ink);
+        background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+      }
+      .calc-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+      .calc-total-field .calc-input { width: 180px; font-weight: 700; }
+      .calc-reset {
+        font: inherit; font-size: 13.5px; color: var(--accent); background: var(--accent-soft);
+        border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer;
+      }
+      .calc-reset:hover { border-color: var(--accent); }
+      .calc-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 18px; }
+      .calc-asset { padding: 2px 18px; }
+      .calc-asset:first-child { padding-left: 0; }
+      .calc-asset:last-child { padding-right: 0; }
+      .calc-asset + .calc-asset { border-left: 1px solid var(--line); }
+      .calc-asset h3 { margin: 0 0 10px; font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+      .calc-asset h3 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+      .calc-asset .field { display: block; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+      .calc-out { margin-top: 12px; padding-top: 11px; border-top: 1px dashed var(--line); }
+      .calc-weight { font-size: 13px; color: var(--muted); }
+      .calc-weight b { color: var(--ink-soft); font-weight: 600; }
+      .calc-alloc { font-size: 27px; font-weight: 700; line-height: 1.3; }
+      .calc-share { font-size: 12.5px; color: var(--muted); min-height: 19px; }
+      .calc-msg { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+      .calc-msg.warn { color: var(--gap); }
+      .calc-note { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+      .live-status {
+        margin: 0 0 14px; padding: 10px 14px; border-radius: 8px; font-size: 13.5px;
+        background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--line);
+      }
+      .live-status.ok { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
+      .live-status.fallback { background: var(--gap-soft); color: var(--ink); }
+      .live-status b { font-weight: 700; }
+      .calc-date { font-size: 12.5px; color: var(--muted); margin: -6px 0 10px; min-height: 19px; }
+      /* ---------- responsive ---------- */
+      @media (max-width: 640px) {
+        main { padding: 20px 13px 44px; }
+        h1 { font-size: 28px; }
+        .stats { grid-template-columns: repeat(2, 1fr); }
+        .stat .value { font-size: 22px; }
+        .idx-row { grid-template-columns: 106px 1fr auto; gap: 8px; }
+        .idx-name { font-size: 14px; gap: 5px; }
+        .month { padding: 14px 12px 12px; }
+        .mini th, .mini td { padding: 6px 4px; font-size: 13px; }
+        .mini th { font-size: 11.5px; }
+        .dotcell .dot { margin-right: 3px; }
+        .calc-card { padding: 14px 12px; }
+        .calc-grid { grid-template-columns: 1fr; }
+        .calc-asset { padding: 14px 0 4px; }
+        .calc-asset:first-child { padding-top: 2px; }
+        .calc-asset + .calc-asset { border-left: none; border-top: 1px solid var(--line); }
+        .calc-total-field { flex: 1; }
+        .calc-total-field .calc-input { width: 100%; }
+        .year-head { flex-wrap: wrap; row-gap: 2px; padding: 11px 13px; }
+        .year-title { font-size: 18px; }
+        .year-sum { flex-basis: calc(100% - 30px); font-size: 12.5px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <div class="kicker">
+          <span class="chip">公开只读 · 分配数据自动更新</span>
+          <span>月度台账截至 2026-11-06</span>
+        </div>
+        <h1>定投20年</h1>
+        <p class="sub">
+          每月目标 <b class="num">3,000</b> 元，按估值动态分配到 <b>纳斯达克100</b>、<b>中证500</b>、<b>黄金</b> 三个标的——便宜多买，贵少买。2026 年 4 月起投，以下为实际执行记录。
+        </p>
+      </header>
+
+      <!-- 概览 -->
+      <section aria-label="概览">
+        <div class="stats">
+          <div class="stat main">
+            <div class="label">累计实际投入</div>
+            <div class="value num"><small>¥</small>3,987</div>
+          </div>
+          <div class="stat">
+            <div class="label">累计理论目标（8 个月）</div>
+            <div class="value num"><small>¥</small>24,000</div>
+          </div>
+          <div class="stat gap">
+            <div class="label">累计缺口</div>
+            <div class="value num"><small>¥</small>20,013</div>
+          </div>
+          <div class="stat">
+            <div class="label">目标完成率</div>
+            <div class="value num">16.6%</div>
+          </div>
+          <div class="stat">
+            <div class="label">累计定投</div>
+            <div class="value num"><small>¥</small>2,400</div>
+          </div>
+          <div class="stat">
+            <div class="label">累计补投</div>
+            <div class="value num"><small>¥</small>1,587</div>
+          </div>
+          <div class="stat">
+            <div class="label">每月定投基数</div>
+            <div class="value num"><small>¥</small>300</div>
+          </div>
+          <div class="stat">
+            <div class="label">已记录月份</div>
+            <div class="value num">8 <small style="font-size:13px">个月</small></div>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-head">
+            <span>累计投入进度：<b class="num">¥3,987</b> / 理论目标 <b class="num">¥24,000</b></span>
+            <span>缺口 <b class="num" style="color:var(--gap)">¥20,013</b></span>
+          </div>
+          <div class="track" role="img" aria-label="累计投入占理论目标的 16.6%，其中定投 2400 元、补投 1587 元">
+            <div class="fill-dingtou" style="width:10%"></div>
+            <div class="fill-butou" style="width:6.6%"></div>
+          </div>
+          <div class="legend">
+            <span><span class="dot" style="background:var(--accent)"></span>定投 ¥2,400</span>
+            <span><span class="dot" style="background:var(--gold)"></span>补投 ¥1,587</span>
+            <span><span class="dot" style="background:var(--bar-track)"></span>尚未投入（缺口）¥20,013</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 三标的累计 -->
+      <section aria-label="三标的累计投入">
+        <h2>三标的累计投入 <span class="hint">按实际买入金额统计</span></h2>
+        <div class="idx-rows">
+          <div class="idx-row">
+            <div class="idx-name"><span class="dot" style="background:var(--ndx)"></span>纳斯达克100</div>
+            <div class="idx-bar"><i style="background:var(--ndx); width:96.1%"></i></div>
+            <div class="idx-amt num">¥1,294<span class="share">占 32.5%</span></div>
+          </div>
+          <div class="idx-row">
+            <div class="idx-name"><span class="dot" style="background:var(--csi)"></span>中证500</div>
+            <div class="idx-bar"><i style="background:var(--csi); width:100%"></i></div>
+            <div class="idx-amt num">¥1,347<span class="share">占 33.8%</span></div>
+          </div>
+          <div class="idx-row">
+            <div class="idx-name"><span class="dot" style="background:var(--gold)"></span>黄金</div>
+            <div class="idx-bar"><i style="background:var(--gold); width:99.9%"></i></div>
+            <div class="idx-amt num">¥1,346<span class="share">占 33.8%</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 月度走势图 -->
+      <section aria-label="每月实际投入与目标对比">
+        <h2>每月实际投入 vs 目标 <span class="hint">虚线为每月理论目标 3,000 元</span></h2>
+        <div class="chart-card">
+          <svg viewBox="0 0 640 296" role="img" aria-label="柱状图：2026年4月至11月每月实际投入分别为300、300、300、600、649、632、540、666元，均低于每月3000元目标">
+            <!-- gridlines -->
+            <g stroke="var(--line)" stroke-width="1">
+              <line x1="46" y1="196" x2="628" y2="196" />
+              <line x1="46" y1="142" x2="628" y2="142" />
+              <line x1="46" y1="88" x2="628" y2="88" />
+            </g>
+            <g fill="var(--muted)" font-size="11" text-anchor="end">
+              <text x="40" y="254">0</text>
+              <text x="40" y="200">1,000</text>
+              <text x="40" y="146">2,000</text>
+              <text x="40" y="92">3,000</text>
+            </g>
+            <!-- target line at 3000 (y=88) -->
+            <line x1="46" y1="88" x2="628" y2="88" stroke="var(--gap)" stroke-width="1.6" stroke-dasharray="6 4" />
+            <text x="628" y="78" fill="var(--gap)" font-size="12" text-anchor="end">目标 3,000</text>
+            <!-- bars: height = value/3000*162, baseline y=250 -->
+            <g fill="var(--accent)">
+              <rect x="66"  y="234" width="44" height="16" rx="3" />
+              <rect x="139" y="234" width="44" height="16" rx="3" />
+              <rect x="212" y="234" width="44" height="16" rx="3" />
+              <rect x="285" y="218" width="44" height="32" rx="3" />
+              <rect x="358" y="215" width="44" height="35" rx="3" />
+              <rect x="431" y="216" width="44" height="34" rx="3" />
+              <rect x="504" y="221" width="44" height="29" rx="3" />
+              <rect x="577" y="214" width="44" height="36" rx="3" />
+            </g>
+            <g fill="var(--ink)" font-size="12.5" font-weight="600" text-anchor="middle" class="num">
+              <text x="88"  y="226">300</text>
+              <text x="161" y="226">300</text>
+              <text x="234" y="226">300</text>
+              <text x="307" y="210">600</text>
+              <text x="380" y="207">649</text>
+              <text x="453" y="208">632</text>
+              <text x="526" y="213">540</text>
+              <text x="599" y="206">666</text>
+            </g>
+            <g fill="var(--muted)" font-size="12" text-anchor="middle">
+              <text x="88"  y="272">4月</text>
+              <text x="161" y="272">5月</text>
+              <text x="234" y="272">6月</text>
+              <text x="307" y="272">7月</text>
+              <text x="380" y="272">8月</text>
+              <text x="453" y="272">9月</text>
+              <text x="526" y="272">10月</text>
+              <text x="599" y="272">11月</text>
+            </g>
+            <line x1="46" y1="250" x2="628" y2="250" stroke="var(--ink-soft)" stroke-width="1" />
+          </svg>
+        </div>
+      </section>
+
+      <!-- 每月分配计算 -->
+      <section aria-label="每月分配计算">
+        <h2>每月分配计算 <span class="hint">打开页面自动获取最新行情计算，也可手动改点位试算</span></h2>
+        <div class="calc-card">
+          <p class="calc-formula">公式：<b>位置权重 = 30 月均值 ÷ 当前点位</b>；<b>分配金额 = 月度总金额 × 该标的权重 ÷ 三权重合计</b>。点位相对长期均值越低，权重越高、分得越多。金额取整用最大余数法，三者合计严格等于总金额。</p>
+          <p class="live-status" id="live-status" role="status">正在自动获取最新行情数据…</p>
+          <div class="calc-top">
+            <label class="calc-total-field">月度总金额（元）
+              <input id="calc-total" class="calc-input num" type="number" inputmode="decimal" min="0" step="1" value="3000" />
+            </label>
+            <button type="button" id="calc-reset" class="calc-reset">恢复最新数据</button>
+          </div>
+          <div class="calc-grid">
+            <div class="calc-asset">
+              <h3><span class="dot" style="background:var(--ndx)"></span>纳斯达克100</h3>
+              <div class="calc-date num" id="date-ndx">点位日期 —</div>
+              <label class="field">当前点位
+                <input id="in-ndx-cur" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="26629.81" />
+              </label>
+              <label class="field">30 月均值
+                <input id="in-ndx-avg" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="23625.38" />
+              </label>
+              <div class="calc-out">
+                <div class="calc-weight">位置权重 <b class="num" id="out-ndx-w">—</b></div>
+                <div class="calc-alloc num" id="out-ndx-a">—</div>
+                <div class="calc-share num" id="out-ndx-s"></div>
+              </div>
+            </div>
+            <div class="calc-asset">
+              <h3><span class="dot" style="background:var(--csi)"></span>中证500</h3>
+              <div class="calc-date num" id="date-csi">点位日期 —</div>
+              <label class="field">当前点位
+                <input id="in-csi-cur" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="6597.35" />
+              </label>
+              <label class="field">30 月均值
+                <input id="in-csi-avg" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="6607.42" />
+              </label>
+              <div class="calc-out">
+                <div class="calc-weight">位置权重 <b class="num" id="out-csi-w">—</b></div>
+                <div class="calc-alloc num" id="out-csi-a">—</div>
+                <div class="calc-share num" id="out-csi-s"></div>
+              </div>
+            </div>
+            <div class="calc-asset">
+              <h3><span class="dot" style="background:var(--gold)"></span>黄金 <span style="font-size:12px; font-weight:400; color:var(--muted)">元/克（上海金 Au9999）</span></h3>
+              <div class="calc-date num" id="date-gold">点位日期 —</div>
+              <label class="field">当前点位
+                <input id="in-gold-cur" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="868.57" />
+              </label>
+              <label class="field">30 月均值
+                <input id="in-gold-avg" class="calc-input num" type="number" inputmode="decimal" min="0" step="0.01" value="801.93" />
+              </label>
+              <div class="calc-out">
+                <div class="calc-weight">位置权重 <b class="num" id="out-gold-w">—</b></div>
+                <div class="calc-alloc num" id="out-gold-a">—</div>
+                <div class="calc-share num" id="out-gold-s"></div>
+              </div>
+            </div>
+          </div>
+          <p class="calc-msg" id="calc-msg" role="status"></p>
+          <p class="calc-note">打开页面时，本模块自动从东方财富获取三标的最新收盘与滚动 30 月均值并计算分配，口径与记账空间「最新分配」一致；上方状态行会标明数据日期与更新时间。也可以手动改任意点位试算，计算只在本页进行，不保存、不改动下方记录。若自动更新暂不可用，将回退到 2026-11-06 的快照数据（947 / 1,068 / 985）并明确标注。下方月度台账为历史记录，不随行情变化。</p>
+        </div>
+      </section>
+
+      <!-- 月度明细 -->
+      <section aria-label="月度明细">
+        <h2>月度明细 <span class="hint">按年份分组，点击年份条可展开 / 收起；金额单位：元；顺序为 纳指 / 中证500 / 黄金</span></h2>
+
+        <div class="year-group">
+          <button type="button" class="year-head" aria-expanded="true">
+            <span class="year-title">2026 年</span>
+            <span class="year-sum num">共 8 个月 · 定投 <b>¥2,400</b> · 补投 <b>¥1,587</b> · 实际投入 <b>¥3,987</b> · 当年缺口 <b class="ygap">¥20,013</b></span>
+            <span class="year-chev" aria-hidden="true">▾</span>
+          </button>
+          <div class="year-body">
+
+        <!-- 2026-11 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 11 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,334</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>891</td><td>1,133</td><td>976</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>210</td><td>233</td><td>223</td><td class="total">666</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b>（88 / 111 / 101）</span>
+            <span>补投 <b>¥366</b>（每标的 122）</span>
+          </div>
+          <p class="note">备注：截至本月累计缺口 20,013 元。</p>
+        </article>
+
+        <!-- 2026-10 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 10 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,460</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>912</td><td>1,073</td><td>1,015</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>170</td><td>186</td><td>184</td><td class="total">540</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b>（90 / 106 / 104）</span>
+            <span>补投 <b>¥240</b>（每标的 80）</span>
+          </div>
+          <p class="note">备注：截至本月累计缺口 17,679 元。</p>
+        </article>
+
+        <!-- 2026-09 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 9 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,368</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>985</td><td>1,043</td><td>972</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>200</td><td>216</td><td>216</td><td class="total">632</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥332</b></span>
+          </div>
+          <p class="note">备注：截至本月累计缺口 15,219 元。理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+        <!-- 2026-08 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 8 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,351</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>965</td><td>1,044</td><td>991</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>210</td><td>219</td><td>220</td><td class="total">649</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥349</b></span>
+          </div>
+          <p class="note">理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+        <!-- 2026-07 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 7 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,400</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>975</td><td>939</td><td>1,086</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>195</td><td>192</td><td>213</td><td class="total">600</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥300</b></span>
+          </div>
+          <p class="note">理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+        <!-- 2026-06 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 6 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,700</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>992</td><td>1,035</td><td>973</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>96</td><td>101</td><td>103</td><td class="total">300</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥0</b></span>
+          </div>
+          <p class="note">理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+        <!-- 2026-05 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 5 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,700</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>1,060</td><td>1,010</td><td>930</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>104</td><td>98</td><td>98</td><td class="total">300</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥0</b></span>
+          </div>
+          <p class="note">理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+        <!-- 2026-04 -->
+        <article class="month">
+          <div class="month-head">
+            <div class="month-name">2026 年 4 月</div>
+            <div class="month-gap">当月缺口<b class="num">¥2,700</b></div>
+          </div>
+          <table class="mini num">
+            <tr>
+              <th></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--ndx)"></span>纳指</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--csi)"></span>中证500</span></th>
+              <th><span class="dotcell"><span class="dot" style="background:var(--gold)"></span>黄金</span></th>
+              <th>合计</th>
+            </tr>
+            <tr>
+              <td class="rowlabel">理论分配</td><td>1,129</td><td>1,025</td><td>846</td><td class="total">3,000</td>
+            </tr>
+            <tr class="actual">
+              <td class="rowlabel">实际投入</td><td>109</td><td>102</td><td>89</td><td class="total">300</td>
+            </tr>
+          </table>
+          <div class="meta-line num">
+            <span>定投 <b>¥300</b></span>
+            <span>补投 <b>¥0</b></span>
+          </div>
+          <p class="note">理论分配为 2026-11-06 按原公式补算。</p>
+        </article>
+
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <p>口径说明：每月定投基数 300 元，实际投入超过 300 元的部分计为补投；当月缺口 = 当月理论目标 3,000 元 − 当月实际投入。</p>
+        <p>理论分配按三标的估值位置动态分配：2026 年 10、11 月为当月计算，4–9 月为 2026-11-06 按同一公式与历史行情补算。</p>
+        <p>黄金数据源口径：2026-11-06 起由 COMEX（美元/盎司）改为上海金 Au9999（人民币/克），每月正式计算与每日参考均用新口径；本页所列 2026-04 至 2026-11 的历史分配为当时 COMEX 口径下的计算结果，保持不变。</p>
+        <p>本页「每月分配计算」的行情数据在打开时自动更新；月度台账部分为历史记录快照，截至 2026-11-06，后续随每月记录更新后重新发布。</p>
+      </footer>
+    </main>
+    <script>
+      (function () {
+        // 回退快照：2026-11-06 收盘（与记账空间「最新分配」一致），自动更新失败时使用
+        var SNAPSHOT = {
+          total: "3000",
+          ndx: ["26629.81", "23625.38"],
+          csi: ["6597.35", "6607.42"],
+          gold: ["868.57", "801.93"],
+          dates: { ndx: "2026-11-05", csi: "2026-11-06", gold: "2026-11-06" }
+        };
+        var EXAMPLE = SNAPSHOT;
+        var LIVE = null; // 自动获取成功后的最新数据（供「恢复最新数据」使用）
+        var KEYS = ["ndx", "csi", "gold"];
+        function el(id) { return document.getElementById(id); }
+        function parseNum(v) {
+          if (v === null || v === undefined) return NaN;
+          var s = String(v).trim().replace(/,/g, "");
+          if (s === "") return NaN;
+          var n = Number(s);
+          return isFinite(n) ? n : NaN;
+        }
+        function fmt(n) { return n.toLocaleString("zh-CN"); }
+        function calc() {
+          var msg = el("calc-msg");
+          var totalRaw = parseNum(el("calc-total").value);
+          var weights = [];
+          var valid = totalRaw > 0;
+          KEYS.forEach(function (k) {
+            var cur = parseNum(el("in-" + k + "-cur").value);
+            var avg = parseNum(el("in-" + k + "-avg").value);
+            if (cur > 0 && avg > 0) {
+              weights.push(avg / cur);
+            } else {
+              weights.push(NaN);
+              valid = false;
+            }
+          });
+          if (!valid) {
+            KEYS.forEach(function (k) {
+              el("out-" + k + "-w").textContent = "—";
+              el("out-" + k + "-a").textContent = "—";
+              el("out-" + k + "-s").textContent = "";
+            });
+            msg.textContent = "请把三个标的的当前点位、30 月均值和月度总金额都填上正数，就能算出分配金额。";
+            msg.className = "calc-msg warn";
+            return;
+          }
+          var total = Math.round(totalRaw);
+          var sumW = weights[0] + weights[1] + weights[2];
+          var raw = weights.map(function (w) { return (total * w) / sumW; });
+          var alloc = raw.map(function (x) { return Math.floor(x); });
+          var rest = total - (alloc[0] + alloc[1] + alloc[2]);
+          var order = [0, 1, 2].sort(function (a, b) {
+            return raw[b] - Math.floor(raw[b]) - (raw[a] - Math.floor(raw[a]));
+          });
+          for (var i = 0; i < rest; i++) alloc[order[i % 3]] += 1;
+          KEYS.forEach(function (k, i) {
+            el("out-" + k + "-w").textContent = weights[i].toFixed(4);
+            el("out-" + k + "-a").textContent = "¥" + fmt(alloc[i]);
+            el("out-" + k + "-s").textContent = "占 " + ((weights[i] / sumW) * 100).toFixed(1) + "%";
+          });
+          msg.textContent = "三标的分配合计 ¥" + fmt(alloc[0] + alloc[1] + alloc[2]) + "，与月度总金额一致。";
+          msg.className = "calc-msg";
+        }
+        ["calc-total", "in-ndx-cur", "in-ndx-avg", "in-csi-cur", "in-csi-avg", "in-gold-cur", "in-gold-avg"].forEach(function (id) {
+          el(id).addEventListener("input", calc);
+        });
+        function applyData(d) {
+          el("calc-total").value = d.total;
+          KEYS.forEach(function (k) {
+            el("in-" + k + "-cur").value = d[k][0];
+            el("in-" + k + "-avg").value = d[k][1];
+            if (d.dates && d.dates[k]) {
+              el("date-" + k).textContent = "点位日期 " + d.dates[k] + (d.samples && d.samples[k] ? " · 均值样本 " + d.samples[k] + " 个交易日" : "");
+            }
+          });
+          calc();
+        }
+        el("calc-reset").addEventListener("click", function () {
+          applyData(LIVE || SNAPSHOT);
+        });
+        calc();
+
+        /* ---------- 打开页面时自动获取最新行情（东方财富 JSONP） ---------- */
+        // 注：东方财富 100.NDX 实为纳斯达克综合指数，纳斯达克100 的正确 secid 为 100.NDX100
+        // （其 2026-11-05 收盘 26629.81 与记账空间快照一致，已核对）。
+        var ASSETS = [
+          { key: "ndx", secid: "100.NDX100", market: "us" },
+          { key: "csi", secid: "1.000905", market: "cn", closeMin: 15 * 60 },
+          { key: "gold", secid: "118.Au9999", market: "gold", closeMin: 15 * 60 + 30 }
+        ];
+        function pad(n) { return (n < 10 ? "0" : "") + n; }
+        function tzParts(tz) {
+          try {
+            var parts = new Intl.DateTimeFormat("en-US", {
+              timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+              hour: "2-digit", minute: "2-digit", hour12: false
+            }).formatToParts(new Date());
+            var o = {};
+            parts.forEach(function (p) { o[p.type] = p.value; });
+            var hour = parseInt(o.hour, 10) % 24;
+            return {
+              date: o.year + "-" + o.month + "-" + o.day,
+              minutes: hour * 60 + parseInt(o.minute, 10),
+              label: o.year + "-" + o.month + "-" + o.day + " " + pad(hour) + ":" + o.minute
+            };
+          } catch (e) { return null; }
+        }
+        function minusMonths(dateStr, months) {
+          var p = dateStr.split("-");
+          var total = parseInt(p[0], 10) * 12 + (parseInt(p[1], 10) - 1) - months;
+          var y = Math.floor(total / 12), m = (total % 12) + 1;
+          var maxDay = new Date(y, m, 0).getDate();
+          var d = Math.min(parseInt(p[2], 10), maxDay);
+          return y + "-" + pad(m) + "-" + pad(d);
+        }
+        function begStr() {
+          var now = new Date();
+          var t = new Date(now.getFullYear(), now.getMonth() - 32, 1);
+          return "" + t.getFullYear() + pad(t.getMonth() + 1) + pad(t.getDate());
+        }
+        var cbSeq = 0;
+        function fetchKlines(secid, attempt) {
+          return new Promise(function (resolve, reject) {
+            var cbName = "__emcb" + (++cbSeq) + "_" + Date.now();
+            var script = document.createElement("script");
+            var timer = setTimeout(function () { cleanup(); retryOrFail(); }, 12000);
+            function cleanup() {
+              clearTimeout(timer);
+              try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+              if (script.parentNode) script.parentNode.removeChild(script);
+            }
+            function retryOrFail() {
+              if (attempt < 1) fetchKlines(secid, attempt + 1).then(resolve, reject);
+              else reject(new Error("timeout/error"));
+            }
+            window[cbName] = function (resp) {
+              cleanup();
+              try {
+                var kl = resp && resp.data && resp.data.klines;
+                if (!kl || !kl.length) { reject(new Error("empty")); return; }
+                var rows = [];
+                for (var i = 0; i < kl.length; i++) {
+                  var f = String(kl[i]).split(",");
+                  var c = parseFloat(f[1]);
+                  if (f[0] && isFinite(c)) rows.push({ d: f[0], c: c });
+                }
+                if (rows.length < 100) { reject(new Error("short")); return; }
+                resolve(rows);
+              } catch (e) { reject(e); }
+            };
+            script.onerror = function () { cleanup(); retryOrFail(); };
+            script.src = "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=" + encodeURIComponent(secid) +
+              "&fields1=f1,f2,f3&fields2=f51,f53&klt=101&fqt=0&beg=" + begStr() + "&end=20500101&cb=" + cbName;
+            document.head.appendChild(script);
+          });
+        }
+        function completedRows(rows, asset) {
+          var out = rows.slice();
+          if (asset.market === "us") {
+            var et = tzParts("America/New_York");
+            if (!et) return out;
+            out = out.filter(function (r) { return r.d <= et.date; });
+            // 美股当日 bar 在纽约收盘（16:00）前为盘中数据，剔除
+            if (out.length && out[out.length - 1].d === et.date && et.minutes < 16 * 60 + 5) out.pop();
+            return out;
+          }
+          var bj = tzParts("Asia/Shanghai");
+          if (!bj) return out;
+          // 剔除日期晚于今天的 bar（上海金夜盘提前生成的下一交易日 bar 一律剔除）
+          out = out.filter(function (r) { return r.d <= bj.date; });
+          // 当日 bar 在收盘前为盘中数据，剔除
+          if (out.length && out[out.length - 1].d === bj.date && bj.minutes < asset.closeMin) out.pop();
+          return out;
+        }
+        function computeAsset(rows, asset) {
+          var done = completedRows(rows, asset);
+          if (done.length < 100) throw new Error("insufficient");
+          var last = done[done.length - 1];
+          var start = minusMonths(last.d, 30);
+          var sum = 0, n = 0;
+          for (var i = 0; i < done.length; i++) {
+            if (done[i].d >= start) { sum += done[i].c; n++; }
+          }
+          if (n < 400) throw new Error("window too short");
+          return { cur: last.c, avg: sum / n, date: last.d, n: n };
+        }
+        function setStatus(cls, html) {
+          var s = el("live-status");
+          s.className = "live-status" + (cls ? " " + cls : "");
+          s.innerHTML = html;
+        }
+        function fmt2(n) { return n.toFixed(2); }
+        function loadLive() {
+          Promise.all(ASSETS.map(function (a) {
+            return fetchKlines(a.secid, 0).then(function (rows) { return computeAsset(rows, a); });
+          })).then(function (results) {
+            var d = { total: "3000", dates: {}, samples: {} };
+            ASSETS.forEach(function (a, i) {
+              d[a.key] = [fmt2(results[i].cur), fmt2(results[i].avg)];
+              d.dates[a.key] = results[i].date;
+              d.samples[a.key] = results[i].n;
+            });
+            LIVE = d;
+            EXAMPLE = d;
+            applyData(d);
+            var bj = tzParts("Asia/Shanghai");
+            setStatus("ok", "<b>数据已自动更新</b> · " + (bj ? bj.label : "") + "（北京时间）· 来源：东方财富最新收盘，30 月均值为滚动口径");
+          }).catch(function () {
+            applyData(SNAPSHOT);
+            setStatus("fallback", "<b>数据截至 2026-11-06（自动更新暂不可用）</b> · 当前显示的是 2026-11-06 收盘快照：纳指 947 / 中证500 1,068 / 黄金 985");
+          });
+        }
+        // 先按快照标注点位日期，随后自动更新
+        KEYS.forEach(function (k) {
+          el("date-" + k).textContent = "点位日期 " + SNAPSHOT.dates[k];
+        });
+        loadLive();
+      })();
+    </script>
+    <script>
+      (function () {
+        var groups = document.querySelectorAll(".year-group");
+        groups.forEach(function (g, idx) {
+          var head = g.querySelector(".year-head");
+          var body = g.querySelector(".year-body");
+          if (!head || !body) return;
+          // 默认只展开最新年份（第一个分组），往年收起
+          var open = idx === 0;
+          head.setAttribute("aria-expanded", open ? "true" : "false");
+          body.hidden = !open;
+          head.addEventListener("click", function () {
+            var nowOpen = head.getAttribute("aria-expanded") !== "true";
+            head.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+            body.hidden = !nowOpen;
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
