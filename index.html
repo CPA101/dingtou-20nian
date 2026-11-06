@@ -392,10 +392,10 @@
 
       <!-- 每月分配计算 -->
       <section aria-label="每月分配计算">
-        <h2>每月分配计算 <span class="hint">打开页面自动获取最新行情计算，也可手动改点位试算</span></h2>
+        <h2>每月分配计算 <span class="hint">优先读取每日自动更新数据，也可手动改点位试算</span></h2>
         <div class="calc-card">
           <p class="calc-formula">公式：<b>位置权重 = 30 月均值 ÷ 当前点位</b>；<b>分配金额 = 月度总金额 × 该标的权重 ÷ 三权重合计</b>。点位相对长期均值越低，权重越高、分得越多。金额取整用最大余数法，三者合计严格等于总金额。</p>
-          <p class="live-status" id="live-status" role="status">正在自动获取最新行情数据…</p>
+          <p class="live-status" id="live-status" role="status">正在加载最新分配数据…</p>
           <div class="calc-top">
             <label class="calc-total-field">月度总金额（元）
               <input id="calc-total" class="calc-input num" type="number" inputmode="decimal" min="0" step="1" value="3000" />
@@ -450,7 +450,7 @@
             </div>
           </div>
           <p class="calc-msg" id="calc-msg" role="status"></p>
-          <p class="calc-note">打开页面时，本模块自动从东方财富获取三标的最新收盘与滚动 30 月均值并计算分配，口径与记账空间「最新分配」一致；上方状态行会标明数据日期与更新时间。也可以手动改任意点位试算，计算只在本页进行，不保存、不改动下方记录。若自动更新暂不可用，将回退到 2026-11-06 的快照数据（947 / 1,068 / 985）并明确标注。下方月度台账为历史记录，不随行情变化。</p>
+          <p class="calc-note">分配数据由 GitHub Actions 每个工作日自动抓取、经双源校验后更新，本模块优先读取这份每日数据（data/latest.json）；若该文件不可用，页面也会尝试实时获取东方财富最新行情计算。也可以手动改任意点位试算，计算只在本页进行，不保存、不改动下方记录。若以上更新均不可用，将回退到 2026-11-06 的快照数据（947 / 1,068 / 985）并明确标注。下方月度台账为历史记录，不随行情变化。</p>
         </div>
       </section>
 
@@ -894,6 +894,34 @@
           s.innerHTML = html;
         }
         function fmt2(n) { return n.toFixed(2); }
+        function escHtml(s) {
+          return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+        /* ---------- 第一级：读取 GitHub Actions 每日自动更新的数据文件（同源相对路径） ---------- */
+        // 文件结构：{updated_at_bj, total, instruments: {ndx: {point, point_date, mean30, weight, alloc}, csi500: {...}, gold: {...}}}
+        function loadRepoData() {
+          if (!window.fetch) return Promise.reject(new Error("no fetch"));
+          return fetch("data/latest.json", { cache: "no-store" }).then(function (resp) {
+            if (!resp.ok) throw new Error("http " + resp.status);
+            return resp.json();
+          }).then(function (j) {
+            var inst = j && j.instruments;
+            if (!inst) throw new Error("bad json");
+            var map = { ndx: "ndx", csi: "csi500", gold: "gold" };
+            var d = { total: "3000", dates: {}, samples: {} };
+            if (j.total !== undefined && j.total !== null && parseNum(j.total) > 0) d.total = String(j.total);
+            KEYS.forEach(function (k) {
+              var it = inst[map[k]];
+              if (!it) throw new Error("missing " + k);
+              var p = parseNum(it.point), m = parseNum(it.mean30);
+              if (!(p > 0) || !(m > 0)) throw new Error("invalid " + k);
+              d[k] = [fmt2(p), fmt2(m)];
+              if (it.point_date) d.dates[k] = String(it.point_date);
+            });
+            d.updated = j.updated_at_bj ? String(j.updated_at_bj) : "";
+            return d;
+          });
+        }
         function loadLive() {
           Promise.all(ASSETS.map(function (a) {
             return fetchKlines(a.secid, 0).then(function (rows) { return computeAsset(rows, a); });
@@ -914,11 +942,19 @@
             setStatus("fallback", "<b>数据截至 2026-11-06（自动更新暂不可用）</b> · 当前显示的是 2026-11-06 收盘快照：纳指 947 / 中证500 1,068 / 黄金 985");
           });
         }
-        // 先按快照标注点位日期，随后自动更新
+        // 先按快照标注点位日期，随后按三级顺序加载：
+        // 1) data/latest.json（Actions 每日自动更新）→ 2) 东方财富实时拉取 → 3) 烘焙快照
         KEYS.forEach(function (k) {
           el("date-" + k).textContent = "点位日期 " + SNAPSHOT.dates[k];
         });
-        loadLive();
+        loadRepoData().then(function (d) {
+          LIVE = d;
+          EXAMPLE = d;
+          applyData(d);
+          setStatus("ok", "<b>数据来自每日自动更新</b> · 更新于 " + escHtml(d.updated || "—") + "（北京时间）");
+        }).catch(function () {
+          loadLive();
+        });
       })();
     </script>
     <script>
