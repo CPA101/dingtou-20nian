@@ -1,0 +1,56 @@
+{
+  "updated_at_bj": "2026-11-07 01:00",
+  "total": 3000,
+  "instruments": {
+    "ndx": {
+      "name": "纳斯达克100",
+      "unit": "点",
+      "point": 26629.81,
+      "point_date": "2026-11-05",
+      "mean30": 23625.37,
+      "samples": 629,
+      "prev_close": 28437.17,
+      "weight": 0.8872,
+      "alloc": 947,
+      "check": {
+        "source": "腾讯行情",
+        "ref_price": 26629.81,
+        "diff_pct": 0.0
+      }
+    },
+    "csi500": {
+      "name": "中证500",
+      "unit": "点",
+      "point": 6597.35,
+      "point_date": "2026-11-06",
+      "mean30": 6607.42,
+      "samples": 610,
+      "prev_close": 6740.93,
+      "weight": 1.0015,
+      "alloc": 1068,
+      "check": {
+        "source": "腾讯行情",
+        "ref_price": 6597.35,
+        "diff_pct": 0.0
+      }
+    },
+    "gold": {
+      "name": "黄金（上海金 Au9999）",
+      "unit": "元/克",
+      "point": 868.57,
+      "point_date": "2026-11-06",
+      "mean30": 801.93,
+      "samples": 610,
+      "prev_close": 884.09,
+      "weight": 0.9233,
+      "alloc": 985,
+      "check": {
+        "source": "东方财富实时报价通道",
+        "ref_price": 869.9,
+        "diff_pct": 0.153
+      }
+    }
+  },
+  "source": "东方财富日K（主源）+ 腾讯行情/东方财富实时通道（校验）",
+  "note": "点位为最近已完成交易日收盘；30月均值为滚动口径；金额为最大余数法取整。"
+}
