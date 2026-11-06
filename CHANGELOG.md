@@ -4,6 +4,7 @@
 
 ## 2026-11-07
 
+- 数据自动更新升级：新增 GitHub Actions 流水线（工作日北京时间 16:10），由 `scripts/fetch_data.py` 抓取东方财富日 K 并计算分配，结果写入 `data/latest.json` 与 `data/history.csv`；最新收盘价与腾讯行情（纳指100/中证500）、东方财富实时通道（黄金）双源校验，不通过不发布；页面改为优先读取仓库数据；
 - 独立站上线：迁移至 GitHub Pages（https://cpa101.github.io/dingtou-20nian/ ），不再依赖 Muse 域名，任何浏览器可直接打开；
 - 站点更名为「定投20年」；
 - 补齐项目文件：README（功能、口径、逐月记录、免责声明）、CHANGELOG、LICENSE、.gitignore；
