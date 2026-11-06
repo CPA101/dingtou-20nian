@@ -1,0 +1,42 @@
+name: daily-data-update
+
+# 每个工作日北京时间 16:10 运行（UTC 08:10）：A股/上海金已收盘，美股未开盘，
+# 三个标的的“最近已完成收盘”都稳定。也可以在 Actions 页面手动触发。
+on:
+  schedule:
+    - cron: "10 8 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch data, verify (dual-source) and compute allocation
+        run: python scripts/fetch_data.py
+
+      - name: Commit data if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/latest.json data/history.csv
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "data: 每日分配数据自动更新 ($(TZ=Asia/Shanghai date +%F))"
+            git push
+          fi
