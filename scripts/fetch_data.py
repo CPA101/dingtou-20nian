@@ -20,6 +20,7 @@
 
 任一主源拉取失败或校验不通过 → 非零退出，工作流不会提交坏数据。
 """
+import calendar
 import csv
 import json
 import os
@@ -109,6 +110,7 @@ def minus_30_months(date_str):
     while m <= 0:
         m += 12
         y -= 1
+    d = min(d, calendar.monthrange(y, m)[1])  # 钳制到当月最后一天，避免 09-31 这类非法日期
     return f"{y:04d}-{m:02d}-{d:02d}"
 
 
