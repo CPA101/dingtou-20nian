@@ -1,0 +1,54 @@
+name: monthly-allocation-update
+
+# 每月 1–12 日北京时间 09:05 运行（UTC 01:05）：脚本内判断是否为当月第一个
+# A股交易日（或其后 3 天内的补跑窗口），是才计算当月正式分配并追加到
+# data/months.json；不是则安静退出。也可以在 Actions 页面手动触发，
+# 勾选 force 可跳过交易日窗口判断（仅用于补跑/修复）。
+# 口径：30 个月末收盘均值 ÷ 最新已完成收盘，黄金为上海金 Au9999（2026-12 起）。
+on:
+  schedule:
+    - cron: "5 1 1-12 * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "跳过交易日窗口判断，立即计算当月"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-allocation-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install calendar dependency
+        run: pip install chinese-calendar
+
+      - name: Compute monthly allocation and append to data/months.json
+        run: python scripts/monthly_calc.py ${{ (inputs.force == true) && '--force' || '' }}
+
+      - name: Commit months.json if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/months.json
+          if git diff --cached --quiet; then
+            echo "本月记录无变化，跳过提交"
+          else
+            git commit -m "data: 每月正式分配自动追加 ($(TZ=Asia/Shanghai date +%F))"
+            git pull --rebase origin main
+            git push
+          fi
