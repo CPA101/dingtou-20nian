@@ -17,6 +17,10 @@
 上海金与东方财富实时通道昨收核对（0.6%）；COMEX 与上海金另加单日涨跌
 ±3.5% 合理性检查。任一主源失败或校验不过 → 非零退出（工作流该步
 continue-on-error，保留上一版 returns.json，不发布坏数据）。
+
+另生成逐日收益序列 series（自首笔入场日起的日度成本/估值/盈亏/收益率，
+加上证、沪深300、创业板指三条基准收盘序列），供页面「收益走势」图使用，
+口径与点估算完全一致（序列末点必等于上方总盈亏/总收益率）。
 """
 import json
 import os
@@ -44,6 +48,11 @@ SERIES = {
     "gold_comex": {"name": "黄金（COMEX）", "secid": "101.GC00Y", "clock": "gold"},
 }
 TENCENT_CODE = {"ndx": "usNDX", "csi500": "sh000905"}
+BENCH = {
+    "sh":    {"name": "上证指数", "secid": "1.000001"},
+    "hs300": {"name": "沪深300",  "secid": "1.000300"},
+    "cyb":   {"name": "创业板指", "secid": "0.399006"},
+}
 
 
 def http_bytes(url, headers=None, retries=4):
@@ -120,11 +129,16 @@ def main():
     now_bj = now_utc.astimezone(BJ)
     now_et = now_utc.astimezone(ET)
 
-    # ---- 拉取四条价格序列的最新已完成收盘 ----
+    # ---- 拉取四条价格序列（保留全量日K，供逐日收益序列使用） ----
     latest = {}   # key -> (date, price, prev_price)
+    all_bars = {}  # key -> [(date, close), ...] 已完成 bar
     for key, meta in SERIES.items():
         bars = completed_bars(meta["clock"], eastmoney_daily(meta["secid"]), now_bj, now_et)
+        all_bars[key] = bars
         latest[key] = (bars[-1][0], bars[-1][1], bars[-2][1] if len(bars) > 1 else None)
+    bench_bars = {}
+    for bkey, meta in BENCH.items():
+        bench_bars[bkey] = completed_bars("csi500", eastmoney_daily(meta["secid"]), now_bj, now_et)
 
     # ---- 校验 ----
     for key in ("ndx", "csi500"):
@@ -200,6 +214,82 @@ def main():
         "excluded": excluded,
         "method": ("指数口径估算：每笔买入价取当月计算参考点位，当前价取最近已完成交易日收盘；"
                    "不含基金申赎费、跟踪误差与 QDII 汇率影响，非基金账户实际收益。"),
+    }
+
+    # ---- 逐日收益序列（收益走势图用，与上方估值同口径） ----
+    price_maps = {k: dict(v) for k, v in all_bars.items()}
+    bench_maps = {k: dict(v) for k, v in bench_bars.items()}
+
+    def price_on(pmap, date):
+        """<= date 的最近收盘（前向填充）；早于序列首日时取首日。"""
+        if date in pmap:
+            return pmap[date]
+        cand = [d for d in pmap if d <= date]
+        return pmap[max(cand)] if cand else pmap[min(pmap)]
+
+    entries = []  # (entry_date, series_key, amount, buy_price)
+    for m in store["months"]:
+        if not m.get("actual"):
+            continue
+        for akey in ("ndx", "csi500", "gold"):
+            amt = m["actual"].get(akey) or 0
+            buy = (m.get("buy") or {}).get(akey)
+            if not amt or not buy:
+                continue
+            skey = ("gold_comex" if m.get("gold_unit") == "usd_oz" else "gold_cny") if akey == "gold" else akey
+            edate = None
+            cur = ((m.get("basis") or {}).get("current") or {}).get(akey)
+            if cur and abs(cur.get("price", 0) - buy) < 1e-9:
+                edate = cur.get("date")
+            if not edate:
+                for d, p in all_bars[skey]:
+                    if abs(p - buy) < 1e-9:
+                        edate = d
+                        break
+            entries.append((edate or (m["month"] + "-01"), skey, float(amt), float(buy)))
+
+    # 轴起点 = 台账首个买入日（months.json 的 start_date，2026-04-01）；
+    # 首笔入场参考点在 2026-03-31，入场判定仍按各自参考点日期。
+    start = store.get("start_date") or min(e[0] for e in entries)
+    axis_set = set()
+    for bars in list(all_bars.values()) + list(bench_bars.values()):
+        for d, _ in bars:
+            if start <= d <= payload["asof"]:
+                axis_set.add(d)
+    s_dates, s_cost, s_value, s_pnl, s_rate = [], [], [], [], []
+    bench_series = {k: [] for k in BENCH}
+    for d in sorted(axis_set):
+        cost = 0.0
+        value = 0.0
+        for edate, skey, amt, buy in entries:
+            if edate <= d:
+                cost += amt
+                value += amt * price_on(price_maps[skey], d) / buy
+        if cost == 0:
+            continue
+        s_dates.append(d)
+        s_cost.append(round(cost, 2))
+        s_value.append(round(value, 2))
+        s_pnl.append(round(value - cost, 2))
+        s_rate.append(round((value - cost) / cost * 100, 2))
+        for bkey in BENCH:
+            bench_series[bkey].append(round(price_on(bench_maps[bkey], d), 2))
+    if s_dates:
+        # 末点与上方点估算逐分对齐（同一时点同一口径，避免逐点四舍五入差 1 分）
+        s_cost[-1] = payload["total"]["cost"]
+        s_value[-1] = payload["total"]["value"]
+        s_pnl[-1] = payload["total"]["pnl"]
+        s_rate[-1] = payload["total"]["rate"]
+    payload["series"] = {
+        "start": s_dates[0] if s_dates else None,
+        "dates": s_dates,
+        "cost": s_cost,
+        "value": s_value,
+        "pnl": s_pnl,
+        "rate": s_rate,
+        "bench": {k: {"name": BENCH[k]["name"], "close": bench_series[k]} for k in BENCH},
+        "note": ("逐日序列与上方估算同口径：每笔按其买入参考点位入场（入场日取该月计算参考点日期），"
+                 "之后按各标的当日收盘估值；基准为指数收盘价序列，页面按所选区间起点重订基。"),
     }
     with open(os.path.join(BASE, "data", "returns.json"), "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
