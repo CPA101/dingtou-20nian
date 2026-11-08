@@ -251,10 +251,12 @@ def compute(year, month, today):
         rounded[a] += 1
     assert sum(rounded.values()) == TOTAL
 
-    return {
+    entry = {
         "month": f"{year}-{month:02d}",
         "plan": {"ndx": rounded["ndx"], "csi500": rounded["csi500"], "gold": rounded["gold"]},
         "actual": None,
+        "buy": {a: cur[a][1] for a in cur},
+        "gold_unit": "cny_g",
         "basis": {
             "window": [months[0], months[-1]],
             "avg": avg,
@@ -265,6 +267,7 @@ def compute(year, month, today):
         "source": "github-actions",
         "computed_at": datetime.now(BJ).strftime("%Y-%m-%d %H:%M"),
     }
+    return entry
 
 
 def main():
