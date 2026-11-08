@@ -29,6 +29,44 @@
         "csi500": 1025,
         "gold": 846,
         "ndx": 1129
+      },
+      "basis": {
+        "window": [
+          "2023-10",
+          "2026-03"
+        ],
+        "avg": {
+          "ndx": 20815.04,
+          "csi500": 6065.16,
+          "gold": 3055.53
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-03-31",
+            "price": 23740.19
+          },
+          "csi500": {
+            "date": "2026-03-31",
+            "price": 7617.33
+          },
+          "gold": {
+            "date": "2026-03-31",
+            "price": 4647.6
+          }
+        },
+        "weight": {
+          "ndx": 0.87678,
+          "csi500": 0.79623,
+          "gold": 0.65744
+        },
+        "recomputed": {
+          "ndx": 1129,
+          "csi500": 1025,
+          "gold": 846
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -49,6 +87,44 @@
         "csi500": 1010,
         "gold": 930,
         "ndx": 1060
+      },
+      "basis": {
+        "window": [
+          "2023-11",
+          "2026-04"
+        ],
+        "avg": {
+          "ndx": 21249.79,
+          "csi500": 6159.21,
+          "gold": 3143.38
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-04-30",
+            "price": 27452.12
+          },
+          "csi500": {
+            "date": "2026-04-30",
+            "price": 8349.51
+          },
+          "gold": {
+            "date": "2026-04-30",
+            "price": 4629.6
+          }
+        },
+        "weight": {
+          "ndx": 0.77407,
+          "csi500": 0.73767,
+          "gold": 0.67897
+        },
+        "recomputed": {
+          "ndx": 1060,
+          "csi500": 1010,
+          "gold": 930
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -69,6 +145,44 @@
         "csi500": 1035,
         "gold": 973,
         "ndx": 992
+      },
+      "basis": {
+        "window": [
+          "2023-12",
+          "2026-05"
+        ],
+        "avg": {
+          "ndx": 21729.3,
+          "csi500": 6253.02,
+          "gold": 3228.54
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-05-29",
+            "price": 30333.18
+          },
+          "csi500": {
+            "date": "2026-05-29",
+            "price": 8359.56
+          },
+          "gold": {
+            "date": "2026-05-29",
+            "price": 4593.0
+          }
+        },
+        "weight": {
+          "ndx": 0.71635,
+          "csi500": 0.74801,
+          "gold": 0.70293
+        },
+        "recomputed": {
+          "ndx": 992,
+          "csi500": 1035,
+          "gold": 973
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -89,6 +203,44 @@
         "csi500": 939,
         "gold": 1086,
         "ndx": 975
+      },
+      "basis": {
+        "window": [
+          "2024-01",
+          "2026-06"
+        ],
+        "avg": {
+          "ndx": 22177.64,
+          "csi500": 6373.1,
+          "gold": 3294.1
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-06-30",
+            "price": 30276.35
+          },
+          "csi500": {
+            "date": "2026-06-30",
+            "price": 9031.38
+          },
+          "gold": {
+            "date": "2026-06-30",
+            "price": 4038.5
+          }
+        },
+        "weight": {
+          "ndx": 0.73251,
+          "csi500": 0.70566,
+          "gold": 0.81567
+        },
+        "recomputed": {
+          "ndx": 975,
+          "csi500": 939,
+          "gold": 1086
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -109,6 +261,44 @@
         "csi500": 1044,
         "gold": 991,
         "ndx": 965
+      },
+      "basis": {
+        "window": [
+          "2024-02",
+          "2026-07"
+        ],
+        "avg": {
+          "ndx": 22548.88,
+          "csi500": 6466.33,
+          "gold": 3362.72
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-07-31",
+            "price": 28274.2
+          },
+          "csi500": {
+            "date": "2026-07-31",
+            "price": 7493.99
+          },
+          "gold": {
+            "date": "2026-07-31",
+            "price": 4107.0
+          }
+        },
+        "weight": {
+          "ndx": 0.79751,
+          "csi500": 0.86287,
+          "gold": 0.81878
+        },
+        "recomputed": {
+          "ndx": 965,
+          "csi500": 1044,
+          "gold": 991
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -129,6 +319,44 @@
         "csi500": 1043,
         "gold": 972,
         "ndx": 985
+      },
+      "basis": {
+        "window": [
+          "2024-03",
+          "2026-08"
+        ],
+        "avg": {
+          "ndx": 22929.31,
+          "csi500": 6553.17,
+          "gold": 3443.61
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-08-31",
+            "price": 29456.97
+          },
+          "csi500": {
+            "date": "2026-08-31",
+            "price": 7952.1
+          },
+          "gold": {
+            "date": "2026-08-31",
+            "price": 4481.5
+          }
+        },
+        "weight": {
+          "ndx": 0.7784,
+          "csi500": 0.82408,
+          "gold": 0.76841
+        },
+        "recomputed": {
+          "ndx": 985,
+          "csi500": 1043,
+          "gold": 972
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -153,6 +381,44 @@
         "csi500": 1073,
         "gold": 1015,
         "ndx": 912
+      },
+      "basis": {
+        "window": [
+          "2024-04",
+          "2026-09"
+        ],
+        "avg": {
+          "ndx": 23334.44,
+          "csi500": 6624.81,
+          "gold": 3509.25
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-10-02",
+            "price": 30807.93
+          },
+          "csi500": {
+            "date": "2026-09-30",
+            "price": 7435.16
+          },
+          "gold": {
+            "date": "2026-10-02",
+            "price": 4162.3
+          }
+        },
+        "weight": {
+          "ndx": 0.75742,
+          "csi500": 0.89101,
+          "gold": 0.8431
+        },
+        "recomputed": {
+          "ndx": 912,
+          "csi500": 1073,
+          "gold": 1015
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     },
     {
@@ -177,6 +443,44 @@
         "csi500": 1133,
         "gold": 976,
         "ndx": 891
+      },
+      "basis": {
+        "window": [
+          "2024-05",
+          "2026-10"
+        ],
+        "avg": {
+          "ndx": 23699.25,
+          "csi500": 6652.31,
+          "gold": 3562.45
+        },
+        "current": {
+          "ndx": {
+            "date": "2026-10-30",
+            "price": 28384.85
+          },
+          "csi500": {
+            "date": "2026-10-30",
+            "price": 6266.19
+          },
+          "gold": {
+            "date": "2026-10-30",
+            "price": 3898.9
+          }
+        },
+        "weight": {
+          "ndx": 0.83493,
+          "csi500": 1.06162,
+          "gold": 0.91371
+        },
+        "recomputed": {
+          "ndx": 891,
+          "csi500": 1133,
+          "gold": 976
+        },
+        "verified": true,
+        "backfilled_at": "2026-11-08",
+        "backfill_note": "由 scripts/backfill_basis.py 按 monthly_calc 同口径复算回填，复算 plan 与已记录 plan 一致。"
       }
     }
   ],
