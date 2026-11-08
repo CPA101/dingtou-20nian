@@ -291,8 +291,9 @@
             <div class="value num"><small>¥</small>300</div>
           </div>
           <div class="stat">
-            <div class="label">已记录月份</div>
-            <div class="value num">8 <small style="font-size:13px">个月</small></div>
+            <div class="label">已坚持定投</div>
+            <div class="value num">221 <small style="font-size:13px">天</small></div>
+            <div id="stat-days" style="font-size:12px; color:var(--muted); margin-top:2px">自 2026-04-01 首次买入 · 已记录 8 个月</div>
           </div>
         </div>
         <div class="progress-wrap">
@@ -331,6 +332,22 @@
             <div class="idx-bar"><i style="background:var(--gold); width:99.9%"></i></div>
             <div class="idx-amt num">¥1,346<span class="share">占 33.8%</span></div>
           </div>
+        </div>
+      </section>
+
+      <!-- 已投收益估算 -->
+      <section aria-label="已投收益估算" id="returns">
+        <h2>已投收益估算 <span class="hint">按指数点位估算 · 每日自动更新；金额单位：元</span></h2>
+        <div class="calc-card">
+          <table class="mini num">
+            <tr>
+              <th>标的</th><th>累计投入</th><th>当前估值</th><th>盈亏</th><th>收益率</th>
+            </tr>
+            <tbody id="ret-body">
+              <tr><td class="rowlabel" colspan="5">收益数据加载中…</td></tr>
+            </tbody>
+          </table>
+          <p class="note" id="ret-note">指数口径估算：每笔买入价取当月计算参考点位，当前价取最近已完成交易日收盘；不含基金申赎费、跟踪误差与 QDII 汇率影响，非基金账户实际收益。</p>
         </div>
       </section>
 
@@ -451,6 +468,26 @@
           </div>
           <p class="calc-msg" id="calc-msg" role="status"></p>
           <p class="calc-note">分配数据由 GitHub Actions 每个工作日自动抓取、经双源校验后更新，本模块优先读取这份每日数据（data/latest.json）；若该文件不可用，页面也会尝试实时获取东方财富最新行情计算。也可以手动改任意点位试算，计算只在本页进行，不保存、不改动下方记录。若以上更新均不可用，将回退到 2026-11-06 的快照数据（947 / 1,068 / 985）并明确标注。下方月度台账为历史记录，不随行情变化。</p>
+        </div>
+      </section>
+
+      <!-- 预期回报测算 -->
+      <section aria-label="预期回报测算" id="projection">
+        <h2>预期回报测算 <span class="hint">按恒定年化假设测算，非收益预测；金额单位：元</span></h2>
+        <div class="calc-card">
+          <div class="calc-top">
+            <label class="calc-total-field">每月定投（元）
+              <input id="proj-monthly" class="calc-input num" type="number" inputmode="decimal" min="0" step="100" value="3000" />
+            </label>
+            <label class="calc-total-field">定投年限（年）
+              <input id="proj-years" class="calc-input num" type="number" inputmode="decimal" min="1" step="1" value="20" />
+            </label>
+          </div>
+          <table class="mini num">
+            <tr><th>假设年化</th><th>累计本金</th><th>预期收益</th><th>期末资产</th></tr>
+            <tbody id="proj-body"></tbody>
+          </table>
+          <p class="note">测算方法：每月月末投入、按「年化 ÷ 12」月复利滚存。恒定年化只是数学假设，实际收益随市场波动、可能为负；未计申赎费与税费。本测算不构成收益承诺。</p>
         </div>
       </section>
 
@@ -998,6 +1035,14 @@
             d.nActual += 1;
             ASSETS.forEach(function (a) { d.assetTot[a.key] += m.actual[a.key] || 0; });
           });
+          d.startDate = data.start_date || (months.length ? months[0].month + "-01" : null);
+          d.days = null;
+          if (d.startDate) {
+            var sd = new Date(d.startDate + "T00:00:00");
+            var td = new Date();
+            td.setHours(0, 0, 0, 0);
+            d.days = Math.round((td - sd) / 86400000);
+          }
           return d;
         }
 
@@ -1020,7 +1065,9 @@
             setVal(4, "<small>¥</small>" + fmt(d.totBase));
             setVal(5, "<small>¥</small>" + fmt(d.totFill));
             setVal(6, "<small>¥</small>" + fmt(d.baseCap));
-            setVal(7, d.nActual + ' <small style="font-size:13px">个月</small>');
+            setVal(7, (d.days !== null && d.days !== undefined ? d.days : d.nActual) + ' <small style="font-size:13px">' + (d.days !== null && d.days !== undefined ? "天" : "个月") + "</small>");
+            var daysEl = document.getElementById("stat-days");
+            if (daysEl && d.startDate) daysEl.textContent = "自 " + d.startDate + " 首次买入 · 已记录 " + d.nActual + " 个月";
           }
           var head = sec.querySelector(".progress-head");
           if (head) {
@@ -1186,6 +1233,69 @@
             renderLedger(d);
           })
           .catch(function () { /* 读取失败：保留静态快照 */ });
+
+        // ---- 已投收益估算（data/returns.json，每日流水线更新） ----
+        function renderReturns(r) {
+          var body = document.getElementById("ret-body");
+          if (!body || !r || !r.assets || !r.total) return;
+          function pnlHtml(v) {
+            var color = v > 0 ? "var(--accent)" : v < 0 ? "var(--gap)" : "inherit";
+            return '<span style="color:' + color + '">' + (v > 0 ? "+" : "") + fmt(v) + "</span>";
+          }
+          function rateHtml(v) {
+            var color = v > 0 ? "var(--accent)" : v < 0 ? "var(--gap)" : "inherit";
+            return '<span style="color:' + color + '">' + (v > 0 ? "+" : "") + Number(v).toFixed(2) + "%</span>";
+          }
+          var html = "";
+          ASSETS.forEach(function (a) {
+            var x = r.assets[a.key];
+            if (!x) return;
+            html += '<tr><td class="rowlabel">' + x.name + "</td><td>" + fmt(x.cost) + "</td><td>" +
+                    fmt(x.value) + "</td><td>" + pnlHtml(x.pnl) + "</td><td>" + rateHtml(x.rate) + "</td></tr>";
+          });
+          var t = r.total;
+          html += '<tr><td class="rowlabel">合计</td><td class="total">' + fmt(t.cost) + '</td><td class="total">' +
+                  fmt(t.value) + '</td><td class="total">' + pnlHtml(t.pnl) + '</td><td class="total">' +
+                  rateHtml(t.rate) + "</td></tr>";
+          body.innerHTML = html;
+          var note = document.getElementById("ret-note");
+          if (note && r.method) note.textContent = "估值时点：" + r.asof + " 收盘 · " + r.method;
+        }
+        fetch("data/returns.json", { cache: "no-store" })
+          .then(function (r) {
+            if (!r.ok) throw new Error("returns " + r.status);
+            return r.json();
+          })
+          .then(renderReturns)
+          .catch(function () {
+            var body = document.getElementById("ret-body");
+            if (body) body.innerHTML = '<tr><td class="rowlabel" colspan="5">收益数据暂不可用（每日自动更新）</td></tr>';
+          });
+
+        // ---- 预期回报测算（纯前端计算） ----
+        (function () {
+          var mEl = document.getElementById("proj-monthly");
+          var yEl = document.getElementById("proj-years");
+          var body = document.getElementById("proj-body");
+          if (!mEl || !yEl || !body) return;
+          function calcProj() {
+            var P = parseFloat(mEl.value) || 0;
+            var yrs = parseFloat(yEl.value) || 0;
+            var n = Math.round(yrs * 12);
+            var principal = P * n;
+            var html = "";
+            [4, 6, 8, 10].forEach(function (ann) {
+              var r = ann / 100 / 12;
+              var fv = r > 0 && n > 0 ? P * ((Math.pow(1 + r, n) - 1) / r) : principal;
+              html += '<tr><td class="rowlabel">年化 ' + ann + '%</td><td>' + fmt(principal) + "</td><td>" +
+                      fmt(fv - principal) + '</td><td class="total">' + fmt(fv) + "</td></tr>";
+            });
+            body.innerHTML = html;
+          }
+          mEl.addEventListener("input", calcProj);
+          yEl.addEventListener("input", calcProj);
+          calcProj();
+        })();
       })();
     </script>
     <script>
