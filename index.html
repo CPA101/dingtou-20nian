@@ -413,6 +413,7 @@
         <div class="calc-card">
           <p class="calc-formula">公式：<b>位置权重 = 30 月均值 ÷ 当前点位</b>；<b>分配金额 = 月度总金额 × 该标的权重 ÷ 三权重合计</b>。点位相对长期均值越低，权重越高、分得越多。金额取整用最大余数法，三者合计严格等于总金额。</p>
           <p class="live-status" id="live-status" role="status">正在加载最新分配数据…</p>
+          <p class="calc-note"><b>口径提示：</b>本卡为「滚动 30 个月每日均值」口径的<b>每日参考</b>；每月正式分配用「30 个月末收盘均值」，两者口径不同。本月正式分配以月度台账为准<span id="official-note">（2026-11：纳斯达克100 891 / 中证500 1,133 / 黄金 976）</span>。</p>
           <div class="calc-top">
             <label class="calc-total-field">月度总金额（元）
               <input id="calc-total" class="calc-input num" type="number" inputmode="decimal" min="0" step="1" value="3000" />
@@ -1113,13 +1114,15 @@
           var rows = d.months.filter(function (m) { return m.actual; });
           if (!rows.length) return;
           var N = rows.length, x0 = 46, x1 = 628, baseY = 250;
-          function Y(v) { return baseY - v / 3000 * 162; }
+          var maxV = Math.max(3000, rows.reduce(function (mx, m) { return Math.max(mx, m._total); }, 0));
+          function Y(v) { return baseY - v / maxV * 162; }
+          var ticks = [maxV / 4, maxV / 2, maxV * 3 / 4, maxV];
           var s = "";
-          s += '<g stroke="var(--line)" stroke-width="1">' + [1000, 2000, 3000].map(function (v) {
+          s += '<g stroke="var(--line)" stroke-width="1">' + ticks.map(function (v) {
             return '<line x1="46" y1="' + Y(v) + '" x2="628" y2="' + Y(v) + '" />';
           }).join("") + "</g>";
-          s += '<g fill="var(--muted)" font-size="11" text-anchor="end"><text x="40" y="254">0</text>' + [1000, 2000, 3000].map(function (v) {
-            return '<text x="40" y="' + (Y(v) + 4) + '">' + fmt(v) + "</text>";
+          s += '<g fill="var(--muted)" font-size="11" text-anchor="end"><text x="40" y="254">0</text>' + ticks.map(function (v) {
+            return '<text x="40" y="' + (Y(v) + 4) + '">' + fmt(Math.round(v)) + "</text>";
           }).join("") + "</g>";
           s += '<line x1="46" y1="' + Y(3000) + '" x2="628" y2="' + Y(3000) + '" stroke="var(--gap)" stroke-width="1.6" stroke-dasharray="6 4" />' +
                '<text x="628" y="' + (Y(3000) - 10) + '" fill="var(--gap)" font-size="12" text-anchor="end">目标 3,000</text>';
@@ -1127,7 +1130,7 @@
           var bars = "", vals = "", labs = "";
           rows.forEach(function (m, i) {
             var cx = x0 + pitch * (i + 0.5);
-            var h = Math.max(2, m._total / 3000 * 162), y = baseY - h;
+            var h = Math.max(2, m._total / maxV * 162), y = baseY - h;
             bars += '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="3" />';
             vals += '<text x="' + cx.toFixed(1) + '" y="' + (y - 8).toFixed(1) + '">' + fmt(m._total) + "</text>";
             var mo = parseInt(m.month.slice(5), 10);
@@ -1231,6 +1234,15 @@
             renderAssets(d);
             renderChart(d);
             renderLedger(d);
+            var offEl = document.getElementById("official-note");
+            if (offEl) {
+              var withPlan = d.months.filter(function (m) { return m.plan; });
+              if (withPlan.length) {
+                var lm = withPlan[withPlan.length - 1];
+                offEl.textContent = "（" + lm.month + "：纳斯达克100 " + fmt(lm.plan.ndx || 0) +
+                  " / 中证500 " + fmt(lm.plan.csi500 || 0) + " / 黄金 " + fmt(lm.plan.gold || 0) + "）";
+              }
+            }
           })
           .catch(function () { /* 读取失败：保留静态快照 */ });
 
