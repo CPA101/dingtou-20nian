@@ -43,5 +43,11 @@ jobs:
             echo "数据无变化，跳过提交"
           else
             git commit -m "data: 每日分配数据自动更新 ($(TZ=Asia/Shanghai date +%F))"
-            git push
+            pushed=0
+            for i in 1 2 3; do
+              if git pull --rebase origin main && git push; then pushed=1; break; fi
+              echo "push 失败（可能与月度流水线并发撞车），5 秒后重试 ($i/3)"
+              sleep 5
+            done
+            if [ "$pushed" != "1" ]; then echo "push 三次均失败"; exit 1; fi
           fi
