@@ -88,6 +88,7 @@
 - **做什么**：按**每月正式口径**（30 个月末收盘均值 ÷ 最新已完成收盘、最大余数法取整）计算当月理论分配，追加到 `data/months.json`（实际投入暂为空），并提交回仓库——页面下次打开即显示新月份；
 - **口径与校验**：纳指100 用 Yahoo Finance `^NDX`（东方财富兜底），中证500 用东方财富，黄金自 2026-12 起用上海金 Au9999；最新收盘同样经双源校验（腾讯行情 / 东方财富实时通道昨收 + 黄金单日涨跌合理性），不通过不写入；
 - **实际投入**：由维护者在每月买入后补填到 `data/months.json` 对应月份，页面随即自动更新当月与累计缺口。
+- **历史复算**：2026-04~11 各月的计算依据（`basis`：30 月窗口、均值、计算时点点位与日期、权重）已由 `scripts/backfill_basis.py` 按同一口径复算回填，8 个月复算分配与已录分配全部一致（`verified: true`）；随时可运行 `python3 scripts/backfill_basis.py --check` 独立复算校验。注意黄金历史均值用 Yahoo `GC=F`（与当年正式计算同源），东方财富 `101.GC00Y` 月 K 的月末取数惯例不同、复算对不上，不可混用。
 
 ## 逐月记录
 
@@ -112,7 +113,8 @@
 ├── scripts/
 │   ├── fetch_data.py           # 每日：抓取行情、双源校验、计算最新分配（仅用 Python 标准库）
 │   ├── fetch_returns.py        # 每日：按买入参考点位估算已投收益，生成 returns.json（仅用 Python 标准库）
-│   └── monthly_calc.py         # 每月：第一个交易日按正式口径计算当月分配并追加台账（标准库 + chinese-calendar）
+│   ├── monthly_calc.py         # 每月：第一个交易日按正式口径计算当月分配并追加台账（标准库 + chinese-calendar）
+│   └── backfill_basis.py       # 审计：按同口径复算历史月份 basis 并校验（手动运行，--check 只校验不写）
 ├── data/
 │   ├── latest.json             # 最新一期分配数据（Actions 每日更新）
 │   ├── history.csv             # 每日分配历史留档
