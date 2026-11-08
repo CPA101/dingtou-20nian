@@ -251,7 +251,7 @@
       <header class="top">
         <div class="kicker">
           <span class="chip">公开只读 · 分配数据自动更新</span>
-          <span>月度台账截至 2026-11-06</span>
+          <span id="ledger-asof">月度台账截至 2026-11</span>
         </div>
         <h1>定投20年</h1>
         <p class="sub">
@@ -260,7 +260,7 @@
       </header>
 
       <!-- 概览 -->
-      <section aria-label="概览">
+      <section aria-label="概览" id="overview">
         <div class="stats">
           <div class="stat main">
             <div class="label">累计实际投入</div>
@@ -313,7 +313,7 @@
       </section>
 
       <!-- 三标的累计 -->
-      <section aria-label="三标的累计投入">
+      <section aria-label="三标的累计投入" id="asset-totals">
         <h2>三标的累计投入 <span class="hint">按实际买入金额统计</span></h2>
         <div class="idx-rows">
           <div class="idx-row">
@@ -335,10 +335,10 @@
       </section>
 
       <!-- 月度走势图 -->
-      <section aria-label="每月实际投入与目标对比">
+      <section aria-label="每月实际投入与目标对比" id="monthly-chart">
         <h2>每月实际投入 vs 目标 <span class="hint">虚线为每月理论目标 3,000 元</span></h2>
         <div class="chart-card">
-          <svg viewBox="0 0 640 296" role="img" aria-label="柱状图：2026年4月至11月每月实际投入分别为300、300、300、600、649、632、540、666元，均低于每月3000元目标">
+          <svg id="chart-svg" viewBox="0 0 640 296" role="img" aria-label="柱状图：2026年4月至11月每月实际投入分别为300、300、300、600、649、632、540、666元，均低于每月3000元目标">
             <!-- gridlines -->
             <g stroke="var(--line)" stroke-width="1">
               <line x1="46" y1="196" x2="628" y2="196" />
@@ -455,7 +455,7 @@
       </section>
 
       <!-- 月度明细 -->
-      <section aria-label="月度明细">
+      <section aria-label="月度明细" id="ledger">
         <h2>月度明细 <span class="hint">按年份分组，点击年份条可展开 / 收起；金额单位：元；顺序为 纳指 / 中证500 / 黄金</span></h2>
 
         <div class="year-group">
@@ -698,7 +698,7 @@
         <p>口径说明：每月定投基数 300 元，实际投入超过 300 元的部分计为补投；当月缺口 = 当月理论目标 3,000 元 − 当月实际投入。</p>
         <p>理论分配按三标的估值位置动态分配：2026 年 10、11 月为当月计算，4–9 月为 2026-11-06 按同一公式与历史行情补算。</p>
         <p>黄金数据源口径：2026-11-06 起由 COMEX（美元/盎司）改为上海金 Au9999（人民币/克），每月正式计算与每日参考均用新口径；本页所列 2026-04 至 2026-11 的历史分配为当时 COMEX 口径下的计算结果，保持不变。</p>
-        <p>本页「每月分配计算」的行情数据在打开时自动更新；月度台账部分为历史记录快照，截至 2026-11-06，后续随每月记录更新后重新发布。</p>
+        <p>本页「每月分配计算」的行情数据在打开时自动更新；月度台账数据存于仓库文件 data/months.json，页面打开时自动读取渲染、当月与累计缺口自动计算。每月第一个 A股交易日，GitHub Actions 自动按公式计算当月理论分配并追加新月份；实际投入由记录维护者在买入后补填，填入后缺口随即更新。若数据文件读取失败，页面保留截至 2026-11 的静态快照。</p>
       </footer>
     </main>
     <script>
@@ -955,6 +955,237 @@
         }).catch(function () {
           loadLive();
         });
+      })();
+    </script>
+    <script>
+      (function () {
+        // 月度台账动态渲染：优先读取 data/months.json，更新概览 / 三标的累计 /
+        // 月度走势图 / 月度明细；缺口在页面内按「当月目标 − 当月实际」自动计算。
+        // 读取失败则保留页面中的静态快照（截至 2026-11）。
+        var ASSETS = [
+          { key: "ndx", name: "纳指", color: "var(--ndx)" },
+          { key: "csi500", name: "中证500", color: "var(--csi)" },
+          { key: "gold", name: "黄金", color: "var(--gold)" }
+        ];
+        function fmt(n) { return Math.round(n).toLocaleString("zh-CN"); }
+        function pct1(x) { return Math.round(x * 10) / 10; }
+        function sumObj(o) {
+          return ASSETS.reduce(function (s, a) { return s + (o && o[a.key] ? o[a.key] : 0); }, 0);
+        }
+
+        function derive(data) {
+          var target = data.target || 3000;
+          var baseCap = data.base || 300;
+          var months = (data.months || []).slice().sort(function (a, b) {
+            return a.month < b.month ? -1 : a.month > b.month ? 1 : 0;
+          });
+          var d = {
+            target: target, baseCap: baseCap, months: months,
+            totActual: 0, totBase: 0, totFill: 0, cumGap: 0, nActual: 0,
+            assetTot: { ndx: 0, csi500: 0, gold: 0 }
+          };
+          months.forEach(function (m) {
+            if (!m.actual) return;
+            m._total = sumObj(m.actual);
+            m._gap = target - m._total;
+            d.cumGap += m._gap;
+            m._cumGap = d.cumGap;
+            m._base = m.base ? sumObj(m.base) : Math.min(baseCap, m._total);
+            m._fill = m._total - m._base;
+            d.totActual += m._total;
+            d.totBase += m._base;
+            d.totFill += m._fill;
+            d.nActual += 1;
+            ASSETS.forEach(function (a) { d.assetTot[a.key] += m.actual[a.key] || 0; });
+          });
+          return d;
+        }
+
+        function renderOverview(d) {
+          var sec = document.getElementById("overview");
+          if (!sec) return;
+          var targetTot = d.target * d.nActual;
+          var stats = sec.querySelectorAll(".stat");
+          function setVal(i, html) {
+            var v = stats[i] && stats[i].querySelector(".value");
+            if (v) v.innerHTML = html;
+          }
+          if (stats.length >= 8) {
+            setVal(0, "<small>¥</small>" + fmt(d.totActual));
+            var lab = stats[1].querySelector(".label");
+            if (lab) lab.textContent = "累计理论目标（" + d.nActual + " 个月）";
+            setVal(1, "<small>¥</small>" + fmt(targetTot));
+            setVal(2, "<small>¥</small>" + fmt(d.cumGap));
+            setVal(3, (targetTot ? d.totActual / targetTot * 100 : 0).toFixed(1) + "%");
+            setVal(4, "<small>¥</small>" + fmt(d.totBase));
+            setVal(5, "<small>¥</small>" + fmt(d.totFill));
+            setVal(6, "<small>¥</small>" + fmt(d.baseCap));
+            setVal(7, d.nActual + ' <small style="font-size:13px">个月</small>');
+          }
+          var head = sec.querySelector(".progress-head");
+          if (head) {
+            var spans = head.querySelectorAll("span");
+            if (spans[0]) spans[0].innerHTML = '累计投入进度：<b class="num">¥' + fmt(d.totActual) + '</b> / 理论目标 <b class="num">¥' + fmt(targetTot) + "</b>";
+            if (spans[1]) spans[1].innerHTML = '缺口 <b class="num" style="color:var(--gap)">¥' + fmt(d.cumGap) + "</b>";
+          }
+          var track = sec.querySelector(".track");
+          if (track) {
+            track.setAttribute("aria-label", "累计投入占理论目标的 " + (targetTot ? d.totActual / targetTot * 100 : 0).toFixed(1) + "%，其中定投 " + d.totBase + " 元、补投 " + d.totFill + " 元");
+            var fd = track.querySelector(".fill-dingtou");
+            var fb = track.querySelector(".fill-butou");
+            if (fd) fd.style.width = (targetTot ? pct1(d.totBase / targetTot * 100) : 0) + "%";
+            if (fb) fb.style.width = (targetTot ? pct1(d.totFill / targetTot * 100) : 0) + "%";
+          }
+          var legend = sec.querySelectorAll(".legend > span");
+          if (legend.length >= 3) {
+            legend[0].innerHTML = '<span class="dot" style="background:var(--accent)"></span>定投 ¥' + fmt(d.totBase);
+            legend[1].innerHTML = '<span class="dot" style="background:var(--gold)"></span>补投 ¥' + fmt(d.totFill);
+            legend[2].innerHTML = '<span class="dot" style="background:var(--bar-track)"></span>尚未投入（缺口）¥' + fmt(d.cumGap);
+          }
+        }
+
+        function renderAssets(d) {
+          var sec = document.getElementById("asset-totals");
+          if (!sec) return;
+          var rows = sec.querySelectorAll(".idx-row");
+          var max = Math.max(d.assetTot.ndx, d.assetTot.csi500, d.assetTot.gold, 1);
+          ASSETS.forEach(function (a, i) {
+            var row = rows[i];
+            if (!row) return;
+            var t = d.assetTot[a.key];
+            var bar = row.querySelector(".idx-bar i");
+            if (bar) bar.style.width = pct1(t / max * 100) + "%";
+            var amt = row.querySelector(".idx-amt");
+            if (amt) amt.innerHTML = "¥" + fmt(t) + '<span class="share">占 ' + (d.totActual ? (t / d.totActual * 100).toFixed(1) : "0.0") + "%</span>";
+          });
+        }
+
+        function renderChart(d) {
+          var svg = document.getElementById("chart-svg");
+          if (!svg) return;
+          var rows = d.months.filter(function (m) { return m.actual; });
+          if (!rows.length) return;
+          var N = rows.length, x0 = 46, x1 = 628, baseY = 250;
+          function Y(v) { return baseY - v / 3000 * 162; }
+          var s = "";
+          s += '<g stroke="var(--line)" stroke-width="1">' + [1000, 2000, 3000].map(function (v) {
+            return '<line x1="46" y1="' + Y(v) + '" x2="628" y2="' + Y(v) + '" />';
+          }).join("") + "</g>";
+          s += '<g fill="var(--muted)" font-size="11" text-anchor="end"><text x="40" y="254">0</text>' + [1000, 2000, 3000].map(function (v) {
+            return '<text x="40" y="' + (Y(v) + 4) + '">' + fmt(v) + "</text>";
+          }).join("") + "</g>";
+          s += '<line x1="46" y1="' + Y(3000) + '" x2="628" y2="' + Y(3000) + '" stroke="var(--gap)" stroke-width="1.6" stroke-dasharray="6 4" />' +
+               '<text x="628" y="' + (Y(3000) - 10) + '" fill="var(--gap)" font-size="12" text-anchor="end">目标 3,000</text>';
+          var pitch = (x1 - x0) / N, bw = Math.min(44, pitch * 0.62);
+          var bars = "", vals = "", labs = "";
+          rows.forEach(function (m, i) {
+            var cx = x0 + pitch * (i + 0.5);
+            var h = Math.max(2, m._total / 3000 * 162), y = baseY - h;
+            bars += '<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="3" />';
+            vals += '<text x="' + cx.toFixed(1) + '" y="' + (y - 8).toFixed(1) + '">' + fmt(m._total) + "</text>";
+            var mo = parseInt(m.month.slice(5), 10);
+            var lab = (mo === 1 || i === 0) ? (m.month.slice(0, 4) + "年" + mo + "月") : (mo + "月");
+            labs += '<text x="' + cx.toFixed(1) + '" y="272">' + lab + "</text>";
+          });
+          s += '<g fill="var(--accent)">' + bars + "</g>";
+          s += '<g fill="var(--ink)" font-size="12.5" font-weight="600" text-anchor="middle" class="num">' + vals + "</g>";
+          s += '<g fill="var(--muted)" font-size="12" text-anchor="middle">' + labs + "</g>";
+          s += '<line x1="46" y1="250" x2="628" y2="250" stroke="var(--ink-soft)" stroke-width="1" />';
+          svg.innerHTML = s;
+          var allBelow = rows.every(function (m) { return m._total < 3000; });
+          svg.setAttribute("aria-label", "柱状图：" + rows.map(function (m) {
+            return m.month.slice(0, 4) + "年" + parseInt(m.month.slice(5), 10) + "月实际投入" + m._total + "元";
+          }).join("、") + (allBelow ? "，均低于每月3000元目标" : ""));
+        }
+
+        function monthArticle(m) {
+          var y = m.month.slice(0, 4), mo = parseInt(m.month.slice(5), 10);
+          var head = '<div class="month-head"><div class="month-name">' + y + " 年 " + mo + " 月</div>";
+          var tbl = '<table class="mini num"><tr><th></th>' + ASSETS.map(function (a) {
+            return '<th><span class="dotcell"><span class="dot" style="background:' + a.color + '"></span>' + a.name + "</span></th>";
+          }).join("") + "<th>合计</th></tr>";
+          tbl += '<tr><td class="rowlabel">理论分配</td>' + ASSETS.map(function (a) {
+            return "<td>" + fmt(m.plan[a.key] || 0) + "</td>";
+          }).join("") + '<td class="total">' + fmt(sumObj(m.plan)) + "</td></tr>";
+          var meta = "", note = "";
+          if (m.actual) {
+            head += '<div class="month-gap">当月缺口<b class="num">¥' + fmt(m._gap) + "</b></div></div>";
+            tbl += '<tr class="actual"><td class="rowlabel">实际投入</td>' + ASSETS.map(function (a) {
+              return "<td>" + fmt(m.actual[a.key] || 0) + "</td>";
+            }).join("") + '<td class="total">' + fmt(m._total) + "</td></tr>";
+            var s1 = "定投 <b>¥" + fmt(m._base) + "</b>";
+            if (m.base) s1 += "（" + ASSETS.map(function (a) { return fmt(m.base[a.key] || 0); }).join(" / ") + "）";
+            var s2 = "补投 <b>¥" + fmt(m._fill) + "</b>";
+            if (m.base && m._fill > 0) {
+              var fills = ASSETS.map(function (a) { return (m.actual[a.key] || 0) - (m.base[a.key] || 0); });
+              if (fills[0] === fills[1] && fills[1] === fills[2]) s2 += "（每标的 " + fmt(fills[0]) + "）";
+              else s2 += "（" + fills.map(fmt).join(" / ") + "）";
+            }
+            meta = '<div class="meta-line num"><span>' + s1 + "</span><span>" + s2 + "</span></div>";
+            note = '<p class="note">备注：截至本月累计缺口 ' + fmt(m._cumGap) + " 元。" + (m.note || "") + "</p>";
+          } else {
+            head += '<div class="month-gap">实际投入<b class="num">待填</b></div></div>';
+            tbl += '<tr class="actual"><td class="rowlabel">实际投入</td><td>—</td><td>—</td><td>—</td><td class="total">—</td></tr>';
+            meta = '<div class="meta-line num"><span>理论分配已生成，实际投入待记录</span></div>';
+            note = m.note ? '<p class="note">备注：' + m.note + "</p>" : "";
+          }
+          tbl += "</table>";
+          return '<article class="month">' + head + tbl + meta + note + "</article>";
+        }
+
+        function renderLedger(d) {
+          var sec = document.getElementById("ledger");
+          if (!sec) return;
+          sec.querySelectorAll(".year-group").forEach(function (g) { g.remove(); });
+          var years = {};
+          d.months.forEach(function (m) {
+            var y = m.month.slice(0, 4);
+            (years[y] = years[y] || []).push(m);
+          });
+          Object.keys(years).sort().reverse().forEach(function (y, yi) {
+            var all = years[y];
+            var withA = all.filter(function (m) { return m.actual; });
+            var b = 0, f = 0, ac = 0, gp = 0;
+            withA.forEach(function (m) { b += m._base; f += m._fill; ac += m._total; gp += m._gap; });
+            var pending = all.length - withA.length;
+            var sum = "共 " + all.length + " 个月 · 定投 <b>¥" + fmt(b) + "</b> · 补投 <b>¥" + fmt(f) +
+                      "</b> · 实际投入 <b>¥" + fmt(ac) + '</b> · 当年缺口 <b class="ygap">¥' + fmt(gp) + "</b>" +
+                      (pending ? " · " + pending + " 个月实际待填" : "");
+            var open = yi === 0;
+            var div = document.createElement("div");
+            div.className = "year-group";
+            div.innerHTML = '<button type="button" class="year-head" aria-expanded="' + (open ? "true" : "false") + '">' +
+              '<span class="year-title">' + y + ' 年</span><span class="year-sum num">' + sum + '</span>' +
+              '<span class="year-chev" aria-hidden="true">▾</span></button>' +
+              '<div class="year-body"' + (open ? "" : " hidden") + ">" +
+              all.slice().reverse().map(monthArticle).join("") + "</div>";
+            sec.appendChild(div);
+            var head = div.querySelector(".year-head");
+            var body = div.querySelector(".year-body");
+            head.addEventListener("click", function () {
+              var nowOpen = head.getAttribute("aria-expanded") !== "true";
+              head.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+              body.hidden = !nowOpen;
+            });
+          });
+        }
+
+        fetch("data/months.json", { cache: "no-store" })
+          .then(function (r) {
+            if (!r.ok) throw new Error("months.json " + r.status);
+            return r.json();
+          })
+          .then(function (data) {
+            var d = derive(data);
+            if (!d.months.length) return;
+            var asof = document.getElementById("ledger-asof");
+            if (asof) asof.textContent = "月度台账截至 " + d.months[d.months.length - 1].month;
+            renderOverview(d);
+            renderAssets(d);
+            renderChart(d);
+            renderLedger(d);
+          })
+          .catch(function () { /* 读取失败：保留静态快照 */ });
       })();
     </script>
     <script>
