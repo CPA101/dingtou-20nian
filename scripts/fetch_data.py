@@ -12,6 +12,7 @@
 - 主源：东方财富日K（纳指100 secid 100.NDX100 / 中证500 1.000905 / 上海金 Au9999 118.AU9999）；
 - 双源校验（最新收盘价交叉核对，偏差超容差 → 报错退出、不发布）：
   纳指100 与中证500 用腾讯行情；黄金用东方财富实时报价接口（与日K不同通道）
+  的昨收 f60 核对（f43 最新价含夜盘报价、与已完成收盘系统性偏离，不用），
   再叠加「单日涨跌幅在 ±3.5% 内」的合理性检查。
 
 产物：
@@ -132,12 +133,20 @@ def tencent_quote(code, now_et):
     return price
 
 
-def eastmoney_quote_price(secid):
-    """东方财富实时报价接口（与日K不同通道）→ 最新价。"""
+def eastmoney_quote_prev_close(secid):
+    """东方财富实时报价接口（与日K不同通道）→ 昨收 f60。
+
+    不用 f43：f43 是当前最新价（含夜盘/下一时段报价），与「最近一个已完成
+    交易日收盘」系统性偏离——隔周末或盘后运行时金价正常波动即可超过容差、
+    误杀流水线（2026-11-07 已在收益脚本上确认此坑、2026-11-09 在本脚本
+    下午时点复现：日K 868.57 vs f43 879.36，差 1.24%）。f60 昨收与日K最新
+    已完成收盘同口径（2026-11-07 实测 f60=868.57 与 11-06 日K收盘分毫不差），
+    与 scripts/fetch_returns.py 的黄金校验一致。
+    """
     url = (f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}"
            f"&fields=f43,f44,f45,f46,f60")
     data = json.loads(http_text(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=4).decode())
-    return float(data["data"]["f43"]) / 100.0
+    return float(data["data"]["f60"]) / 100.0
 
 
 def main():
@@ -169,16 +178,16 @@ def main():
         if diff > TOLERANCE:
             raise RuntimeError(f"{key} 双源校验不通过：主源 {result[key]['point']} vs "
                                f"腾讯 {ref}（偏差 {diff*100:.2f}% > {TOLERANCE*100}%）")
-    # 黄金：异通道核对 + 单日涨跌合理性
-    ref = eastmoney_quote_price(INSTRUMENTS["gold"]["secid"])
+    # 黄金：异通道核对（昨收 vs 日K最新已完成收盘） + 单日涨跌合理性
+    ref = eastmoney_quote_prev_close(INSTRUMENTS["gold"]["secid"])
     diff = abs(ref - result["gold"]["point"]) / result["gold"]["point"]
     day_chg = None
     if result["gold"]["prev_close"]:
         day_chg = abs(result["gold"]["point"] / result["gold"]["prev_close"] - 1)
-    checks["gold"] = {"source": "东方财富实时报价通道", "ref_price": round(ref, 2),
+    checks["gold"] = {"source": "东方财富实时报价通道（昨收）", "ref_price": round(ref, 2),
                       "diff_pct": round(diff * 100, 3)}
     if diff > TOLERANCE:
-        raise RuntimeError(f"gold 双通道校验不通过：日K {result['gold']['point']} vs 实时 {ref}")
+        raise RuntimeError(f"gold 双通道校验不通过：日K {result['gold']['point']} vs 昨收 {ref}")
     if day_chg is not None and day_chg > GOLD_DAY_BAND:
         raise RuntimeError(f"gold 单日涨跌异常：{day_chg*100:.2f}% 超出 ±{GOLD_DAY_BAND*100}%")
 
