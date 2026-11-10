@@ -102,7 +102,13 @@ def completed_bars(clock, bars, now_bj, now_et):
     return bars
 
 
-def tencent_quote(code, now_et):
+def tencent_quote(code, now_et, now_bj):
+    """腾讯行情 → 与最新已完成收盘同口径的核对价（与 fetch_data.py 一致）。
+
+    未收盘时段取昨收 f[4]：A 股主源当日 bar 到北京时间 15:05 后才算完成，
+    在此之前用实时价 f[3] 与昨收比会在盘中误杀（2026-11-10 运行 #5 收益步
+    实测：6586.18 vs 实时 6646.17、偏差 0.91%，与 fetch_data.py 同坑同修）。
+    """
     raw = http_bytes(f"https://qt.gtimg.cn/q={code}")
     text = raw.decode("gbk", errors="replace")
     body = text.split('="', 1)[1].rsplit('"', 1)[0]
@@ -115,6 +121,8 @@ def tencent_quote(code, now_et):
                 price = float(f[4])
         except Exception:
             pass
+    elif now_bj.hour * 60 + now_bj.minute < 15 * 60 + 5:
+        price = float(f[4])
     return price
 
 
@@ -142,7 +150,7 @@ def main():
 
     # ---- 校验 ----
     for key in ("ndx", "csi500"):
-        ref = tencent_quote(TENCENT_CODE[key], now_et)
+        ref = tencent_quote(TENCENT_CODE[key], now_et, now_bj)
         diff = abs(ref - latest[key][1]) / latest[key][1]
         if diff > TOTAL_TOL:
             raise RuntimeError(f"{key} 双源校验不通过：{latest[key][1]} vs 腾讯 {ref}（{diff*100:.2f}%）")
