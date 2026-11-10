@@ -115,8 +115,15 @@ def minus_30_months(date_str):
     return f"{y:04d}-{m:02d}-{d:02d}"
 
 
-def tencent_quote(code, now_et):
-    """腾讯行情 → 最新价（美股盘中时返回昨收，保证与已完成收盘可比）。"""
+def tencent_quote(code, now_et, now_bj):
+    """腾讯行情 → 与主源最新已完成收盘同口径的核对价。
+
+    美股与 A 股各按自己的市场时钟处理：未收盘时段主源最新已完成收盘就是
+    昨收，核对价取昨收 f[4]；直接用实时价 f[3] 会在盘中与昨收系统性偏离、
+    误杀流水线（中证500 于 2026-11-10 11:11 手动补跑实测：主源周一收盘
+    6586.18 vs 实时 6647.67，偏差 0.93% > 0.6% 容差，运行 #4 被杀；
+    此前只有美股分支有此处理、A 股漏了）。
+    """
     raw = http_text(f"https://qt.gtimg.cn/q={code}")
     text = raw.decode("gbk", errors="replace")
     body = text.split('="', 1)[1].rsplit('"', 1)[0]
@@ -130,6 +137,10 @@ def tencent_quote(code, now_et):
                 price = float(f[4])
         except Exception:
             pass
+    elif now_bj.hour * 60 + now_bj.minute < 15 * 60 + 5:
+        # A股主源当日 bar 到北京时间 15:05 后才算已完成（与 completed_bars
+        # 的 csi500 判定线一致），在此之前核对价取昨收 f[4]
+        price = float(f[4])
     return price
 
 
@@ -171,7 +182,7 @@ def main():
     # ---- 双源校验 ----
     checks = {}
     for key in ("ndx", "csi500"):
-        ref = tencent_quote(TENCENT_CODE[key], now_et)
+        ref = tencent_quote(TENCENT_CODE[key], now_et, now_bj)
         diff = abs(ref - result[key]["point"]) / result[key]["point"]
         checks[key] = {"source": "腾讯行情", "ref_price": round(ref, 2),
                        "diff_pct": round(diff * 100, 3)}
