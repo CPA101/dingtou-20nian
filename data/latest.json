@@ -1,20 +1,20 @@
 {
-  "updated_at_bj": "2026-11-09 15:30",
+  "updated_at_bj": "2026-11-10 11:19",
   "total": 3000,
   "instruments": {
     "ndx": {
       "name": "纳斯达克100",
       "unit": "点",
-      "point": 26989.99,
-      "point_date": "2026-11-06",
-      "mean30": 23630.71,
-      "samples": 630,
-      "prev_close": 26629.81,
-      "weight": 0.8755,
-      "alloc": 937,
+      "point": 27907.63,
+      "point_date": "2026-11-09",
+      "mean30": 23663.99,
+      "samples": 628,
+      "prev_close": 26989.99,
+      "weight": 0.8479,
+      "alloc": 920,
       "check": {
         "source": "腾讯行情",
-        "ref_price": 26989.99,
+        "ref_price": 27907.63,
         "diff_pct": 0.0
       }
     },
@@ -27,7 +27,7 @@
       "samples": 608,
       "prev_close": 6597.35,
       "weight": 1.004,
-      "alloc": 1075,
+      "alloc": 1090,
       "check": {
         "source": "腾讯行情",
         "ref_price": 6586.18,
@@ -37,16 +37,16 @@
     "gold": {
       "name": "黄金（上海金 Au9999）",
       "unit": "元/克",
-      "point": 868.57,
-      "point_date": "2026-11-06",
-      "mean30": 801.93,
-      "samples": 610,
-      "prev_close": 884.09,
-      "weight": 0.9233,
-      "alloc": 988,
+      "point": 881.0,
+      "point_date": "2026-11-09",
+      "mean30": 803.33,
+      "samples": 608,
+      "prev_close": 868.57,
+      "weight": 0.9118,
+      "alloc": 990,
       "check": {
         "source": "东方财富实时报价通道（昨收）",
-        "ref_price": 868.57,
+        "ref_price": 881.0,
         "diff_pct": 0.0
       }
     }
