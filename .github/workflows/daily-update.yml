@@ -11,6 +11,11 @@ name: daily-data-update
 #   外部触发当天没来时还有机会补上；各档算的是同一批已完成收盘，
 #   先成功的一档之后，下一档无数据变化时不会重复提交（仅更新时间
 #   变化时多一个提交，属正常）。
+# - 保底闸门：带 backup 标记的外部触发、与 GitHub 自带 11:07 定时，
+#   先检查 data/latest.json 与 data/returns.json 的更新日期是否均为今天，
+#   均为今天说明主档已成功，本轮整轮跳过、不抓数不提交；任一不是今天
+#   才真正执行补跑。08:41 主档（外部触发与自带定时）与手动触发不受闸门
+#   影响，照常执行。
 # - 手动：Actions 页面 workflow_dispatch。
 # 数据口径：A股 09:30 开盘前出数，中证500/上海金用上一个交易日的收盘、
 # 纳指用今晨刚收盘的美股数据——三者都是已完成收盘。
@@ -41,20 +46,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Backup gate (skip if already updated today)
+        id: gate
+        if: ${{ github.event.client_payload.slot == 'backup' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * 1-5') }}
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
+          LATEST_DATE=$(python3 -c "import json; print(json.load(open('data/latest.json'))['updated_at_bj'][:10])")
+          RETURNS_DATE=$(python3 -c "import json; print(json.load(open('data/returns.json'))['updated_at_bj'][:10])")
+          echo "latest.json 更新日期 $LATEST_DATE，returns.json 更新日期 $RETURNS_DATE，今天 $TODAY"
+          if [ "$LATEST_DATE" = "$TODAY" ] && [ "$RETURNS_DATE" = "$TODAY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "今日数据已更新，保底档跳过本轮"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "今日数据未齐，保底档执行补跑"
+          fi
+
       - name: Setup Python
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Fetch data, verify (dual-source) and compute allocation
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         run: python scripts/fetch_data.py
 
       - name: Compute invested returns estimate (data/returns.json)
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         id: returns
         continue-on-error: true
         run: python scripts/fetch_returns.py
 
       - name: Commit data if changed
+        if: ${{ steps.gate.outputs.skip != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
