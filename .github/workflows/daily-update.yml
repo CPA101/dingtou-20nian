@@ -15,7 +15,7 @@ name: daily-data-update
 # 数据口径：A股 09:30 开盘前出数，中证500/上海金用上一个交易日的收盘、
 # 纳指用今晨刚收盘的美股数据——三者都是已完成收盘。
 # 失败告警（审计 P2-2）：任一步骤硬失败、或收益步骤（按设计
-# continue-on-error、不阻断主数据）失败时，末尾一步自动建 issue
+# continue-on-error、不阻断主数据）失败时，末尾告警步自动建 issue
 # 留痕（同日同名去重），不再悄无声息。
 
 on:
@@ -72,21 +72,31 @@ jobs:
             if [ "$pushed" != "1" ]; then echo "push 三次均失败"; exit 1; fi
           fi
 
-      - name: Alert on failure (auto issue, P2-2)
-        if: ${{ always() && (failure() || steps.returns.outcome == 'failure') }}
+      - name: Alert on workflow failure (auto issue, P2-2)
+        if: ${{ failure() }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HARD_FAILED: ${{ failure() }}
-          RETURNS_OUTCOME: ${{ steps.returns.outcome }}
         run: |
           TODAY=$(TZ=Asia/Shanghai date +%F)
           TITLE="每日数据更新异常 $TODAY"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "$HARD_FAILED" = "true" ]; then
-            BODY="每日数据更新工作流本次运行失败（多半死在抓数/双源校验或提交步骤），页面数据未更新。失败那一步的日志末尾有具体原因（哪个标的、主源与校验源各是多少）。运行详情：$RUN_URL"
+          BODY="每日数据更新工作流本次运行失败（多半死在抓数/双源校验或提交步骤），页面数据未更新。失败那一步的日志末尾有具体原因（哪个标的、主源与校验源各是多少）。运行详情：$RUN_URL"
+          EXISTING=$(gh issue list --state open --search "$TITLE" --json number --jq 'length' 2>/dev/null || echo 0)
+          if [ "$EXISTING" != "0" ]; then
+            echo "今日已有同名告警 issue，跳过重复创建"
           else
-            BODY="收益估算步骤（fetch_returns.py）本次失败：latest.json 已照常更新，但 returns.json 未更新，页面收益曲线可能滞后。运行详情：$RUN_URL"
+            gh issue create --title "$TITLE" --body "$BODY" || echo "建 issue 失败，不影响主流程"
           fi
+
+      - name: Alert on returns failure (auto issue, P2-2)
+        if: ${{ always() && steps.returns.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
+          TITLE="每日数据更新异常 $TODAY"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="收益估算步骤（fetch_returns.py）本次失败：latest.json 已照常更新，但 returns.json 未更新，页面收益曲线可能滞后。运行详情：$RUN_URL"
           EXISTING=$(gh issue list --state open --search "$TITLE" --json number --jq 'length' 2>/dev/null || echo 0)
           if [ "$EXISTING" != "0" ]; then
             echo "今日已有同名告警 issue，跳过重复创建"
