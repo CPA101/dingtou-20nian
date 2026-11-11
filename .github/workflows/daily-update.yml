@@ -1,21 +1,34 @@
 name: daily-data-update
 
-# 每个工作日北京时间 08:41 主跑（UTC 00:41）、11:07 兜底（UTC 03:07）：
-# A股 09:30 开盘前出数，中证500/上海金用上一个交易日的收盘、纳指用今晨
-# 刚收盘的美股数据——三者都是已完成收盘，且当天交易时段内即可照此分配买入。
-# 原定 09:00 连续两日不可靠：2026-11-09 被 GitHub 延迟到 15:18 才启动、
-# 11-10 到 11:00 仍未触发。GitHub 官方说明整点是定时任务高负载时段、过载
-# 时排队任务会被丢弃，08:00（UTC 00:00）更是全天最挤的一分钟，故两档都
-# 错开整点（小时为 2026-11-10 用户所定）；两档算的是同一批已完成收盘，
-# 第一档已成功时第二档无变化、不会重复提交。也可以在 Actions 页面手动触发。
+# 触发方式（2026-11-11 起）：
+# - 主触发：外部定时器（cron-job.org）每个工作日北京时间 08:41 调用
+#   repository_dispatch API（事件名 daily-update），绕开 GitHub 自家定时
+#   队列——GitHub 的 schedule 连续多日延迟数小时甚至丢弃（2026-11-09
+#   定时迟到到 15:18 才启动、11-10 迟到到 19:05、11-11 的 08:41 到
+#   09:38 仍未触发），API 触发不走调度队列、不受此影响。
+#   对接配置见 docs/external-trigger.md。
+# - 兜底：GitHub 自带定时 08:41（UTC 00:41）与 11:07（UTC 03:07）保留，
+#   外部触发当天没来时还有机会补上；各档算的是同一批已完成收盘，
+#   先成功的一档之后，下一档无数据变化时不会重复提交（仅更新时间
+#   变化时多一个提交，属正常）。
+# - 手动：Actions 页面 workflow_dispatch。
+# 数据口径：A股 09:30 开盘前出数，中证500/上海金用上一个交易日的收盘、
+# 纳指用今晨刚收盘的美股数据——三者都是已完成收盘。
+# 失败告警（审计 P2-2）：任一步骤硬失败、或收益步骤（按设计
+# continue-on-error、不阻断主数据）失败时，末尾一步自动建 issue
+# 留痕（同日同名去重），不再悄无声息。
+
 on:
   schedule:
     - cron: "41 0 * * 1-5"
     - cron: "7 3 * * 1-5"
+  repository_dispatch:
+    types: [daily-update]
   workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: daily-data-update
@@ -37,6 +50,7 @@ jobs:
         run: python scripts/fetch_data.py
 
       - name: Compute invested returns estimate (data/returns.json)
+        id: returns
         continue-on-error: true
         run: python scripts/fetch_returns.py
 
@@ -56,4 +70,26 @@ jobs:
               sleep 5
             done
             if [ "$pushed" != "1" ]; then echo "push 三次均失败"; exit 1; fi
+          fi
+
+      - name: Alert on failure (auto issue, P2-2)
+        if: ${{ always() && (failure() || steps.returns.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HARD_FAILED: ${{ failure() }}
+          RETURNS_OUTCOME: ${{ steps.returns.outcome }}
+        run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
+          TITLE="每日数据更新异常 $TODAY"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "$HARD_FAILED" = "true" ]; then
+            BODY="每日数据更新工作流本次运行失败（多半死在抓数/双源校验或提交步骤），页面数据未更新。失败那一步的日志末尾有具体原因（哪个标的、主源与校验源各是多少）。运行详情：$RUN_URL"
+          else
+            BODY="收益估算步骤（fetch_returns.py）本次失败：latest.json 已照常更新，但 returns.json 未更新，页面收益曲线可能滞后。运行详情：$RUN_URL"
+          fi
+          EXISTING=$(gh issue list --state open --search "$TITLE" --json number --jq 'length' 2>/dev/null || echo 0)
+          if [ "$EXISTING" != "0" ]; then
+            echo "今日已有同名告警 issue，跳过重复创建"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" || echo "建 issue 失败，不影响主流程"
           fi
