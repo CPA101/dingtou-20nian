@@ -11,6 +11,8 @@
 
 - 外部定时器已于当日完成设置并实测通过：细粒度令牌 `dingtou-daily-dispatch` 已创建（仅授权本仓库 Contents / Actions 读写，有效期至 2027-11-11）；cron-job.org 任务「dingtou daily-update 08:41 BJ」已建并启用（工作日 08:41、Asia/Shanghai、失败通知开启）；测试触发返回 HTTP 204，GitHub 侧 repository_dispatch 运行 #12 成功。外部触发自此为每日流水线主通道，首个定时实跑为 2026-11-12 08:41。
 
+- 外部触发补保底档并加保底闸门：cron-job.org 另建 11:07 兜底任务（body 带 `client_payload.slot=backup`，测试返回 204、repository_dispatch 运行 #13 成功）；工作流新增「保底闸门」——保底触发（外部 backup 标记，或 GitHub 自带 11:07 定时）先核对 data/latest.json 与 data/returns.json 的更新日期是否均为今天，均为今天则整轮跳过、不抓数不提交，主档未成功时才真正补跑；08:41 主档与手动触发不受闸门影响。
+
 
 ## 2026-11-10
 
