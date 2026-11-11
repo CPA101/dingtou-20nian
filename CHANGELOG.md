@@ -9,6 +9,8 @@
 
 - 落地审计 P2-2 失败自动告警：每日流水线任一步骤硬失败、或收益步骤（fetch_returns.py，按设计失败不阻断主数据）失败时，运行末尾自动建 issue《每日数据更新异常 YYYY-MM-DD》（同日同名去重），注明失败类型并附运行链接；工作流权限相应加 `issues: write`。
 
+- 外部定时器已于当日完成设置并实测通过：细粒度令牌 `dingtou-daily-dispatch` 已创建（仅授权本仓库 Contents / Actions 读写，有效期至 2027-11-11）；cron-job.org 任务「dingtou daily-update 08:41 BJ」已建并启用（工作日 08:41、Asia/Shanghai、失败通知开启）；测试触发返回 HTTP 204，GitHub 侧 repository_dispatch 运行 #12 成功。外部触发自此为每日流水线主通道，首个定时实跑为 2026-11-12 08:41。
+
 
 ## 2026-11-10
 
