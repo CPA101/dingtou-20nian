@@ -55,16 +55,21 @@ BENCH = {
 }
 
 
-def http_bytes(url, headers=None, retries=4):
+def http_bytes(url, headers=None, retries=6):
+    # 与 scripts/fetch_data.py 同款加固（共享逻辑，两份一起改）：数据源偶发
+    # 断连/502 时递增间隔 3/8/20/45/90 秒、共 6 次尝试，扛分钟级抽风窗口；
+    # 全部失败才报错退出，口径与校验逻辑不变。背景见 fetch_data.py 注释。
+    delays = [3, 8, 20, 45, 90]
     last = None
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers={**UA, **(headers or {})})
             with urllib.request.urlopen(req, timeout=30) as r:
                 return r.read()
         except Exception as e:
             last = e
-            time.sleep(3)
+            if attempt < retries - 1:
+                time.sleep(delays[min(attempt, len(delays) - 1)])
     raise last
 
 
@@ -123,13 +128,32 @@ def tencent_quote(code, now_et, now_bj):
             pass
     elif now_bj.hour * 60 + now_bj.minute < 15 * 60 + 5:
         price = float(f[4])
+        # 盘前例外与 fetch_data.py 同修：腾讯快照日期（f[30]）小于今天时，
+        # 快照还停在上一交易日，f[3] 才是最新已完成收盘，f[4] 会误杀
+        # （2026-11-12 08:52 实测偏差 1.00%）。
+        try:
+            qdate = datetime.strptime(f[30][:8], "%Y%m%d").date()
+            if qdate < now_bj.date():
+                price = float(f[3])
+        except Exception:
+            pass
     return price
 
 
 def eastmoney_quote_prev_close(secid):
-    url = (f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f43,f60")
-    data = json.loads(http_bytes(url, headers={"Referer": "https://quote.eastmoney.com/"}).decode())
-    return float(data["data"]["f60"]) / 100.0
+    # 节点兜底与 fetch_data.py 同款（2026-11-12 push2 主机名 502、编号
+    # 镜像节点正常）：多节点依次尝试，口径不变。
+    hosts = ["push2.eastmoney.com", "82.push2.eastmoney.com",
+             "63.push2.eastmoney.com", "7.push2.eastmoney.com"]
+    last = None
+    for host in hosts:
+        url = (f"https://{host}/api/qt/stock/get?secid={secid}&fields=f43,f60")
+        try:
+            data = json.loads(http_bytes(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=3).decode())
+            return float(data["data"]["f60"]) / 100.0
+        except Exception as e:
+            last = e
+    raise last
 
 
 def main():
