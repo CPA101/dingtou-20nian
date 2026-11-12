@@ -11,11 +11,14 @@ name: daily-data-update
 #   外部触发当天没来时还有机会补上；各档算的是同一批已完成收盘，
 #   先成功的一档之后，下一档无数据变化时不会重复提交（仅更新时间
 #   变化时多一个提交，属正常）。
-# - 保底闸门：带 backup 标记的外部触发、与 GitHub 自带 11:07 定时，
-#   先检查 data/latest.json 与 data/returns.json 的更新日期是否均为今天，
-#   均为今天说明主档已成功，本轮整轮跳过、不抓数不提交；任一不是今天
-#   才真正执行补跑。08:41 主档（外部触发与自带定时）与手动触发不受闸门
-#   影响，照常执行。
+# - 闸门（2026-11-12 扩围）：带 backup 标记的外部触发、与 GitHub 自带
+#   定时（08:41 与 11:07 两档），先检查 data/latest.json 与
+#   data/returns.json 的更新日期是否均为今天，均为今天说明今天的活已
+#   干完，本轮整轮跳过、不抓数不提交；任一不是今天才真正执行补跑。
+#   外部 08:41 主触发（repository_dispatch 无 backup 标记）与手动触发
+#   不受闸门影响，照常执行。扩围原因：2026-11-12 GitHub 自带 08:41
+#   定时迟到近 7 小时（15:39 才触发，运行 #20），在外部触发已更新数据
+#   后仍全量重跑并死在抓数步，白发一封失败告警邮件。
 # - 手动：Actions 页面 workflow_dispatch。
 # 数据口径：A股 09:30 开盘前出数，中证500/上海金用上一个交易日的收盘、
 # 纳指用今晨刚收盘的美股数据——三者都是已完成收盘。
@@ -46,9 +49,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Backup gate (skip if already updated today)
+      - name: Gate (skip if already updated today)
         id: gate
-        if: ${{ github.event.client_payload.slot == 'backup' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * 1-5') }}
+        if: ${{ github.event.client_payload.slot == 'backup' || github.event_name == 'schedule' }}
         run: |
           TODAY=$(TZ=Asia/Shanghai date +%F)
           LATEST_DATE=$(python3 -c "import json; print(json.load(open('data/latest.json'))['updated_at_bj'][:10])")
@@ -56,10 +59,10 @@ jobs:
           echo "latest.json 更新日期 $LATEST_DATE，returns.json 更新日期 $RETURNS_DATE，今天 $TODAY"
           if [ "$LATEST_DATE" = "$TODAY" ] && [ "$RETURNS_DATE" = "$TODAY" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "今日数据已更新，保底档跳过本轮"
+            echo "今日数据已更新，本轮跳过"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "今日数据未齐，保底档执行补跑"
+            echo "今日数据未齐，本轮执行"
           fi
 
       - name: Setup Python
