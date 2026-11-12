@@ -51,16 +51,23 @@ TOLERANCE = 0.006        # 双源偏差容差 0.6%
 GOLD_DAY_BAND = 0.035    # 黄金单日涨跌合理性带宽 ±3.5%
 
 
-def http_text(url, headers=None, retries=3):
+def http_text(url, headers=None, retries=6):
+    # 东方财富/腾讯偶发断连（Remote end closed / 502）：固定 3 秒短间隔、
+    # 3–4 次重试扛不过分钟级抽风窗口（2026-11-12 外部触发首跑 08:41 与
+    # 手动补跑 08:46 连续两次被断连杀掉、抓数步仅 7–16 秒即退出）。
+    # 改为递增间隔 3/8/20/45/90 秒、共 6 次尝试：抽风窗口内自动等恢复；
+    # 全部失败才报错退出，数据口径与校验逻辑不变。
+    delays = [3, 8, 20, 45, 90]
     last = None
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers={**UA, **(headers or {})})
             with urllib.request.urlopen(req, timeout=30) as r:
                 return r.read()
-        except Exception as e:  # 东方财富偶发断连，重试不改变口径
+        except Exception as e:
             last = e
-            time.sleep(3)
+            if attempt < retries - 1:
+                time.sleep(delays[min(attempt, len(delays) - 1)])
     raise last
 
 
@@ -69,7 +76,7 @@ def eastmoney_daily(secid):
     url = (f"https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={secid}"
            f"&klt=101&fqt=0&beg=20200101&end=20500101"
            f"&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57")
-    raw = http_text(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=4)
+    raw = http_text(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=6)
     data = json.loads(raw.decode())
     if data.get("rc") != 0 or not data.get("data", {}).get("klines"):
         raise RuntimeError(f"东方财富无数据: {secid}")
@@ -141,6 +148,17 @@ def tencent_quote(code, now_et, now_bj):
         # A股主源当日 bar 到北京时间 15:05 后才算已完成（与 completed_bars
         # 的 csi500 判定线一致），在此之前核对价取昨收 f[4]
         price = float(f[4])
+        # 例外——盘前（约 09:15 前，08:41 主档正落在此窗口）腾讯快照还停
+        # 在上一交易日：f[30] 日期小于今天，此时 f[3] 就是上一交易日收盘
+        # （= 主源最新已完成收盘），f[4] 反而是上上个交易日的收盘、会误杀
+        # （2026-11-12 08:52 本地实测：主源周三收盘 6713.18 vs f[4] 周二
+        # 收盘 6645.89，偏差 1.00% > 0.6%）。按快照日期改取 f[3]。
+        try:
+            qdate = datetime.strptime(f[30][:8], "%Y%m%d").date()
+            if qdate < now_bj.date():
+                price = float(f[3])
+        except Exception:
+            pass
     return price
 
 
@@ -154,10 +172,22 @@ def eastmoney_quote_prev_close(secid):
     已完成收盘同口径（2026-11-07 实测 f60=868.57 与 11-06 日K收盘分毫不差），
     与 scripts/fetch_returns.py 的黄金校验一致。
     """
-    url = (f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}"
-           f"&fields=f43,f44,f45,f46,f60")
-    data = json.loads(http_text(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=4).decode())
-    return float(data["data"]["f60"]) / 100.0
+    # 节点兜底：2026-11-12 实测 push2.eastmoney.com 主机名整段 502（重试
+    # 6 次、约 3 分钟仍不通），其编号镜像节点（82/63/7.push2）同接口正常。
+    # 改为多节点依次尝试：仍是与日K不同的报价通道，校验口径不变；单节点
+    # 重试 3 次（递增间隔），全灭才报错。
+    hosts = ["push2.eastmoney.com", "82.push2.eastmoney.com",
+             "63.push2.eastmoney.com", "7.push2.eastmoney.com"]
+    last = None
+    for host in hosts:
+        url = (f"https://{host}/api/qt/stock/get?secid={secid}"
+               f"&fields=f43,f44,f45,f46,f60")
+        try:
+            data = json.loads(http_text(url, headers={"Referer": "https://quote.eastmoney.com/"}, retries=3).decode())
+            return float(data["data"]["f60"]) / 100.0
+        except Exception as e:
+            last = e
+    raise last
 
 
 def main():
