@@ -50,7 +50,7 @@ GitHub 网页：右上角头像 → **Settings** → 左栏最下 **Developer se
 | Request body | `{"event_type":"daily-update"}` |
 | 通知 | 打开失败通知（Execution history 里状态码应为 **204** 即成功） |
 
-> 兜底任务（已建）：再建一个同样的任务作保底——Title `dingtou daily-update 11:07 BJ backup`，表达式改 `7 11 * * 1-5`，Request body 改为 `{"event_type":"daily-update","client_payload":{"slot":"backup"}}`，其余字段与主任务完全相同。工作流有「保底闸门」：带 `slot=backup` 的触发（以及 GitHub 自带 11:07 定时）会先核对 data/latest.json 与 data/returns.json 的更新日期是否均为今天，均为今天说明主档已成功，本轮整轮跳过、不产生提交；任一不是今天才真正补跑。
+> 兜底任务（已建）：再建一个同样的任务作保底——Title `dingtou daily-update 11:07 BJ backup`，表达式改 `7 11 * * 1-5`，Request body 改为 `{"event_type":"daily-update","client_payload":{"slot":"backup"}}`，其余字段与主任务完全相同。工作流有「保底闸门」：带 `slot=backup` 的触发（以及 GitHub 自带定时两档，2026-11-12 起扩围）会先核对 data/latest.json 与 data/returns.json 的更新日期是否均为今天，均为今天说明主档已成功，本轮整轮跳过、不产生提交；任一不是今天才真正补跑。
 
 > 备用口（如改走 workflow_dispatch）：URL 换成
 > `https://api.github.com/repos/CPA101/dingtou-20nian/actions/workflows/daily-update.yml/dispatches`，
