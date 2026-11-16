@@ -30,6 +30,12 @@ name: daily-data-update
 # 失败告警（审计 P2-2）：任一步骤硬失败、或收益步骤（按设计
 # continue-on-error、不阻断主数据）失败时，末尾告警步自动建 issue
 # 留痕（同日同名去重），不再悄无声息。
+# 告警口径（2026-11-16 修订）：两步告警在外部 08:41 主触发的运行里
+# 不发——主档失败时 11:07 保底还会整轮补跑，抢先告警只会制造"运行
+# 成功了却收到失败邮件"的假警（2026-11-13、11-16 的异常 issue #2/#3
+# 都建在最终成功的主档运行里，08:44 就发出了邮件）。告警只在保底
+# 触发、GitHub 自带定时与手动触发的运行里发：当天最后防线也失败
+# 了，才真正值得报。
 
 on:
   schedule:
@@ -120,7 +126,7 @@ jobs:
           fi
 
       - name: Alert on workflow failure (auto issue, P2-2)
-        if: ${{ failure() }}
+        if: ${{ failure() && (github.event_name != 'repository_dispatch' || github.event.client_payload.slot == 'backup') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -136,7 +142,7 @@ jobs:
           fi
 
       - name: Alert on returns failure (auto issue, P2-2)
-        if: ${{ always() && steps.returns.outcome == 'failure' }}
+        if: ${{ always() && steps.returns.outcome == 'failure' && (github.event_name != 'repository_dispatch' || github.event.client_payload.slot == 'backup') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
