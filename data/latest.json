@@ -1,52 +1,52 @@
 {
-  "updated_at_bj": "2026-11-16 08:41",
+  "updated_at_bj": "2026-11-17 08:41",
   "total": 3000,
   "instruments": {
     "ndx": {
       "name": "纳斯达克100",
       "unit": "点",
-      "point": 27943.74,
-      "point_date": "2026-11-13",
-      "mean30": 23709.62,
-      "samples": 630,
-      "prev_close": 28289.19,
-      "weight": 0.8485,
-      "alloc": 899,
+      "point": 27197.15,
+      "point_date": "2026-11-16",
+      "mean30": 23740.66,
+      "samples": 628,
+      "prev_close": 27943.74,
+      "weight": 0.8729,
+      "alloc": 904,
       "check": {
         "source": "腾讯行情",
-        "ref_price": 27943.74,
+        "ref_price": 27197.15,
         "diff_pct": 0.0
       }
     },
     "csi500": {
       "name": "中证500",
       "unit": "点",
-      "point": 6465.49,
-      "point_date": "2026-11-13",
-      "mean30": 6616.28,
-      "samples": 610,
-      "prev_close": 6604.15,
-      "weight": 1.0233,
-      "alloc": 1084,
+      "point": 6297.18,
+      "point_date": "2026-11-16",
+      "mean30": 6621.34,
+      "samples": 608,
+      "prev_close": 6465.49,
+      "weight": 1.0515,
+      "alloc": 1089,
       "check": {
         "source": "腾讯行情",
-        "ref_price": 6465.49,
+        "ref_price": 6297.18,
         "diff_pct": 0.0
       }
     },
     "gold": {
       "name": "黄金（上海金 Au9999）",
       "unit": "元/克",
-      "point": 837.55,
-      "point_date": "2026-11-13",
-      "mean30": 804.55,
-      "samples": 610,
-      "prev_close": 851.33,
-      "weight": 0.9606,
-      "alloc": 1017,
+      "point": 829.49,
+      "point_date": "2026-11-16",
+      "mean30": 805.83,
+      "samples": 608,
+      "prev_close": 837.55,
+      "weight": 0.9715,
+      "alloc": 1007,
       "check": {
         "source": "东方财富实时报价通道（昨收）",
-        "ref_price": 837.55,
+        "ref_price": 829.49,
         "diff_pct": 0.0
       }
     }
