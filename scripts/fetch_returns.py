@@ -18,6 +18,12 @@
 ±3.5% 合理性检查。任一主源失败或校验不过 → 非零退出（工作流该步
 continue-on-error，保留上一版 returns.json，不发布坏数据）。
 
+备源（2026-11-19 加）：中证500 与三条基准的日K，东财整段失败时自动切
+腾讯日K（web.ifzq.gtimg.cn fqkline，口径同为不复权日收盘）；纳指与黄金
+腾讯无日K 通道，仍只走东财。黄金昨收校验同日修复下午错位：15:35 后
+最新已完成 bar 变为今日收盘、f60 昨收对应上一根 bar，改为与最近两根
+已完成 bar 任一对齐即通过（详见校验段注释）。
+
 另生成逐日收益序列 series（自首笔入场日起的日度成本/估值/盈亏/收益率，
 加上证、沪深300、创业板指三条基准收盘序列），供页面「收益走势」图使用，
 口径与点估算完全一致（序列末点必等于上方总盈亏/总收益率）。
@@ -81,6 +87,42 @@ def eastmoney_daily(secid):
     if data.get("rc") != 0 or not data.get("data", {}).get("klines"):
         raise RuntimeError(f"东方财富无数据: {secid}")
     return [(k.split(",")[0], float(k.split(",")[2])) for k in data["data"]["klines"]]
+
+
+# 腾讯日K备源覆盖的序列（2026-11-19）：东财对云端机房整段断连时，中证500
+# 与三条基准改走腾讯 fqkline（不复权日收盘，与东财口径一致；2026-11-19
+# 实测 sh000905 返回与东财逐日吻合）。纳指腾讯 fqkline 只回最新一根 bar、
+# 无历史序列，黄金腾讯无上海金/COMEX 日K 通道，两者仍只走东财。
+TENCENT_KLINE = {"csi500": "sh000905", "sh": "sh000001",
+                 "hs300": "sh000300", "cyb": "sz399006"}
+
+
+def tencent_daily(code):
+    """腾讯日K → [(date, close)] 升序。区间自 2025-01-01 起：本脚本只需
+    2026-03-31 之后（逐月买入参考点与序列轴起点），留足前向填充余量。"""
+    end = datetime.now(BJ).strftime("%Y-%m-%d")
+    url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
+           f"param={code},day,2025-01-01,{end},800,")
+    data = json.loads(http_bytes(url, retries=3).decode())
+    node = (data.get("data") or {}).get(code) or {}
+    rows = node.get("day") or node.get("qfqday") or []
+    bars = [(r[0], float(r[2])) for r in rows]
+    if len(bars) < 60:
+        raise RuntimeError(f"腾讯日K数据不足: {code} 仅 {len(bars)} 根")
+    bars.sort()
+    return bars
+
+
+def fetch_daily(key, secid):
+    """主源东财；整段失败时按 TENCENT_KLINE 切腾讯备源（打印留痕）。"""
+    try:
+        return eastmoney_daily(secid)
+    except Exception as e:
+        code = TENCENT_KLINE.get(key)
+        if not code:
+            raise
+        print(f"WARN: {key} 东财日K失败（{e}），切换腾讯备源 {code}", file=sys.stderr)
+        return tencent_daily(code)
 
 
 def completed_bars(clock, bars, now_bj, now_et):
@@ -165,12 +207,12 @@ def main():
     latest = {}   # key -> (date, price, prev_price)
     all_bars = {}  # key -> [(date, close), ...] 已完成 bar
     for key, meta in SERIES.items():
-        bars = completed_bars(meta["clock"], eastmoney_daily(meta["secid"]), now_bj, now_et)
+        bars = completed_bars(meta["clock"], fetch_daily(key, meta["secid"]), now_bj, now_et)
         all_bars[key] = bars
         latest[key] = (bars[-1][0], bars[-1][1], bars[-2][1] if len(bars) > 1 else None)
     bench_bars = {}
     for bkey, meta in BENCH.items():
-        bench_bars[bkey] = completed_bars("csi500", eastmoney_daily(meta["secid"]), now_bj, now_et)
+        bench_bars[bkey] = completed_bars("csi500", fetch_daily(bkey, meta["secid"]), now_bj, now_et)
 
     # ---- 校验 ----
     for key in ("ndx", "csi500"):
@@ -179,9 +221,18 @@ def main():
         if diff > TOTAL_TOL:
             raise RuntimeError(f"{key} 双源校验不通过：{latest[key][1]} vs 腾讯 {ref}（{diff*100:.2f}%）")
     ref = eastmoney_quote_prev_close(SERIES["gold_cny"]["secid"])
-    diff = abs(ref - latest["gold_cny"][1]) / latest["gold_cny"][1]
+    # f60 昨收对齐的是「报价所属交易日的上一收盘」：15:35 前最新已完成 bar
+    # 就是昨收本身；15:35 后今日 bar 已完成，昨收对应上一根 bar。旧写法只
+    # 比最新一根，下午运行时黄金单日涨跌超 0.6% 必误杀（2026-11-19 本地
+    # 补跑实测：今日收盘 801.93 vs 昨收 810.79、偏差 1.09% 被杀，而数据
+    # 本身无误）。改为与最近两根已完成 bar 任一对齐即通过：两根都对不上
+    # 才是真错位，校验目的不变。
+    gold_cands = [latest["gold_cny"][1]]
+    if latest["gold_cny"][2]:
+        gold_cands.append(latest["gold_cny"][2])
+    diff = min(abs(ref - c) / c for c in gold_cands)
     if diff > TOTAL_TOL:
-        raise RuntimeError(f"gold_cny 双通道校验不通过：{latest['gold_cny'][1]} vs 昨收 {ref}")
+        raise RuntimeError(f"gold_cny 双通道校验不通过：昨收 {ref} 与最近两根已完成 bar {gold_cands} 均不对齐")
     for key in ("gold_cny", "gold_comex"):
         prev = latest[key][2]
         if prev:
