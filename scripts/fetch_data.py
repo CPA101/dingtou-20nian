@@ -10,6 +10,11 @@
 
 数据源：
 - 主源：东方财富日K（纳指100 secid 100.NDX100 / 中证500 1.000905 / 上海金 Au9999 118.AU9999）；
+- 备源（2026-11-23 加）：东财日K整段失败时，中证500 切腾讯 fqkline
+  （sh000905）、纳指100 切 Yahoo chart API（^NDX 5 年日线，实测与东财逐日
+  吻合）；黄金 Au9999 无等价免费备源、仍只走东财。备源只换数据通道，下方
+  双源校验口径不变（纳指备源数据仍与腾讯行情核对；中证500 走备源时校验
+  为腾讯行情对腾讯日K、同厂不同通道）；
 - 双源校验（最新收盘价交叉核对，偏差超容差 → 报错退出、不发布）：
   纳指100 与中证500 用腾讯行情；黄金用东方财富实时报价接口（与日K不同通道）
   的昨收 f60 核对（f43 最新价含夜盘报价、与已完成收盘系统性偏离，不用；
@@ -91,6 +96,61 @@ def eastmoney_daily(secid):
         p = k.split(",")
         bars.append((p[0], float(p[2])))
     return bars
+
+
+def tencent_daily(code):
+    """腾讯日K → [(date, close)] 升序（中证500 备源，2026-11-23 加：移植
+    fetch_returns.py 已验代码，区间放宽到 2023-06 起以覆盖 30 月均值窗口）。"""
+    end = datetime.now(BJ).strftime("%Y-%m-%d")
+    url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
+           f"param={code},day,2023-06-01,{end},1000,")
+    data = json.loads(http_text(url, retries=3).decode())
+    node = (data.get("data") or {}).get(code) or {}
+    rows = node.get("day") or node.get("qfqday") or []
+    bars = [(r[0], float(r[2])) for r in rows]
+    if len(bars) < 400:
+        raise RuntimeError(f"腾讯日K数据不足: {code} 仅 {len(bars)} 根")
+    bars.sort()
+    return bars
+
+
+def yahoo_daily():
+    """Yahoo chart API 纳指100日线 → [(date, close)] 升序（纳指备源，
+    2026-11-23 加）。实测 ^NDX 5 年 1255 根、2026-11-20 收 25028.98 与
+    东财分毫不差；时间戳按美东日期归属交易日。"""
+    url = ("https://query2.finance.yahoo.com/v8/finance/chart/"
+           "%5ENDX?range=5y&interval=1d")
+    data = json.loads(http_text(url, headers={"User-Agent": "Mozilla/5.0"}, retries=3).decode())
+    result = (data.get("chart") or {}).get("result") or []
+    if not result:
+        raise RuntimeError("Yahoo chart 无数据")
+    r = result[0]
+    closes = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
+    bars = []
+    for t, c in zip(r.get("timestamp") or [], closes):
+        if c is None:
+            continue
+        d = datetime.fromtimestamp(t, tz=timezone.utc).astimezone(ET).strftime("%Y-%m-%d")
+        bars.append((d, float(c)))
+    if len(bars) < 400:
+        raise RuntimeError(f"Yahoo 日线数据不足: 仅 {len(bars)} 根")
+    bars.sort()
+    return bars
+
+
+def fetch_daily(key, secid):
+    """主源东财；整段失败时中证500 切腾讯、纳指切 Yahoo（打印留痕）。
+    黄金无等价备源，东财失败即原样报错。"""
+    try:
+        return eastmoney_daily(secid)
+    except Exception as e:
+        if key == "csi500":
+            print(f"WARN: csi500 东财日K失败（{e}），切换腾讯备源 sh000905", file=sys.stderr)
+            return tencent_daily("sh000905")
+        if key == "ndx":
+            print(f"WARN: ndx 东财日K失败（{e}），切换 Yahoo 备源 ^NDX", file=sys.stderr)
+            return yahoo_daily()
+        raise
 
 
 def completed_bars(key, bars, now_bj, now_et):
@@ -203,7 +263,7 @@ def main():
 
     result = {}
     for key, meta in INSTRUMENTS.items():
-        bars = completed_bars(key, eastmoney_daily(meta["secid"]), now_bj, now_et)
+        bars = completed_bars(key, fetch_daily(key, meta["secid"]), now_bj, now_et)
         point_date, point = bars[-1]
         start = minus_30_months(point_date)
         window = [c for d, c in bars if d >= start]
