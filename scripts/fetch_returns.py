@@ -18,9 +18,11 @@
 ±6% 合理性检查（2026-11-23 由 ±3.5% 放宽，见 DAY_BAND 注释）。任一主源失败或校验不过 → 非零退出（工作流该步
 continue-on-error，保留上一版 returns.json，不发布坏数据）。
 
-备源（2026-11-19 加）：中证500 与三条基准的日K，东财整段失败时自动切
-腾讯日K（web.ifzq.gtimg.cn fqkline，口径同为不复权日收盘）；纳指与黄金
-腾讯无日K 通道，仍只走东财。黄金昨收校验同日修复下午错位：15:35 后
+备源（2026-11-19 加，2026-11-23 扩）：中证500 与三条基准的日K，东财整段
+失败时自动切腾讯日K（web.ifzq.gtimg.cn fqkline，口径同为不复权日收盘）；
+纳指 2026-11-23 起加 Yahoo chart API 备源（^NDX 5 年日线，实测与东财逐日
+吻合）；黄金腾讯/Yahoo 均无上海金与 COMEX 等价通道，仍只走东财。黄金
+昨收校验 2026-11-19 修复下午错位：15:35 后
 最新已完成 bar 变为今日收盘、f60 昨收对应上一根 bar，改为与最近两根
 已完成 bar 任一对齐即通过（详见校验段注释）。
 
@@ -96,7 +98,8 @@ def eastmoney_daily(secid):
 # 腾讯日K备源覆盖的序列（2026-11-19）：东财对云端机房整段断连时，中证500
 # 与三条基准改走腾讯 fqkline（不复权日收盘，与东财口径一致；2026-11-19
 # 实测 sh000905 返回与东财逐日吻合）。纳指腾讯 fqkline 只回最新一根 bar、
-# 无历史序列，黄金腾讯无上海金/COMEX 日K 通道，两者仍只走东财。
+# 无历史序列，2026-11-23 起改走 Yahoo chart API 备源（见 yahoo_daily）；
+# 黄金腾讯/Yahoo 均无上海金/COMEX 等价日K 通道，仍只走东财。
 TENCENT_KLINE = {"csi500": "sh000905", "sh": "sh000001",
                  "hs300": "sh000300", "cyb": "sz399006"}
 
@@ -117,11 +120,39 @@ def tencent_daily(code):
     return bars
 
 
+def yahoo_daily():
+    """Yahoo chart API 纳指100日线 → [(date, close)] 升序（纳指备源，
+    2026-11-23 加，与 fetch_data.py 同款）。实测 ^NDX 5 年 1255 根、
+    2026-11-20 收 25028.98 与东财分毫不差；时间戳按美东日期归属交易日。"""
+    url = ("https://query2.finance.yahoo.com/v8/finance/chart/"
+           "%5ENDX?range=5y&interval=1d")
+    data = json.loads(http_bytes(url, headers={"User-Agent": "Mozilla/5.0"}, retries=3).decode())
+    result = (data.get("chart") or {}).get("result") or []
+    if not result:
+        raise RuntimeError("Yahoo chart 无数据")
+    r = result[0]
+    closes = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
+    bars = []
+    for t, c in zip(r.get("timestamp") or [], closes):
+        if c is None:
+            continue
+        d = datetime.fromtimestamp(t, tz=timezone.utc).astimezone(ET).strftime("%Y-%m-%d")
+        bars.append((d, float(c)))
+    if len(bars) < 60:
+        raise RuntimeError(f"Yahoo 日线数据不足: 仅 {len(bars)} 根")
+    bars.sort()
+    return bars
+
+
 def fetch_daily(key, secid):
-    """主源东财；整段失败时按 TENCENT_KLINE 切腾讯备源（打印留痕）。"""
+    """主源东财；整段失败时纳指切 Yahoo、中证500 与基准按 TENCENT_KLINE
+    切腾讯备源（打印留痕）。黄金无备源，原样报错。"""
     try:
         return eastmoney_daily(secid)
     except Exception as e:
+        if key == "ndx":
+            print(f"WARN: ndx 东财日K失败（{e}），切换 Yahoo 备源 ^NDX", file=sys.stderr)
+            return yahoo_daily()
         code = TENCENT_KLINE.get(key)
         if not code:
             raise
