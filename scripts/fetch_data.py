@@ -9,12 +9,16 @@
 - 分配金额 = 3000 × 权重 ÷ 三权重合计，最大余数法取整，合计严格等于 3000。
 
 数据源：
-- 主源：东方财富日K（纳指100 secid 100.NDX100 / 中证500 1.000905 / 上海金 Au9999 118.AU9999）；
-- 备源（2026-11-23 加）：东财日K整段失败时，中证500 切腾讯 fqkline
-  （sh000905）、纳指100 切 Yahoo chart API（^NDX 5 年日线，实测与东财逐日
-  吻合）；黄金 Au9999 无等价免费备源、仍只走东财。备源只换数据通道，下方
-  双源校验口径不变（纳指备源数据仍与腾讯行情核对；中证500 走备源时校验
-  为腾讯行情对腾讯日K、同厂不同通道）；
+- 主源（2026-11-23 晚起）：纳指100 与中证500 走 TradingView 日K
+  （NASDAQ:NDX / SSE:000905，网页图表 WebSocket 通道、免账号；实测与
+  东财逐日对齐——30 月窗口均值 23774.12 / 6622.43 与东财分毫不差）；
+  黄金 Au9999 TradingView 无此标的（不覆盖上海黄金交易所），仍以东方
+  财富日K（118.Au9999）为主源且无备源；
+- 备源（双备源保留）：纳指/中证500 先退东方财富日K（100.NDX100 /
+  1.000905），东财再失败时中证500 切腾讯 fqkline（sh000905）、纳指100
+  切 Yahoo chart API（^NDX 5 年日线）。备源只换数据通道，下方双源校验
+  口径不变（最新收盘仍与腾讯行情核对；中证500 退到腾讯日K时校验为
+  腾讯行情对腾讯日K、同厂不同通道）；
 - 双源校验（最新收盘价交叉核对，偏差超容差 → 报错退出、不发布）：
   纳指100 与中证500 用腾讯行情；黄金用东方财富实时报价接口（与日K不同通道）
   的昨收 f60 核对（f43 最新价含夜盘报价、与已完成收盘系统性偏离，不用；
@@ -138,9 +142,193 @@ def yahoo_daily():
     return bars
 
 
+# ---- TradingView 主源（2026-11-23 晚加）：纯标准库 WebSocket 客户端，
+# 脚本保持零第三方依赖。走其网页图表通道（免账号 unauthorized_user_token），
+# 日线时间戳为交易日 UTC 零点，实测纳指/中证500 与东财逐日对齐（见文件头）。
+# 非官方通道：协议或匿名政策变化时本节抛错，上层自动退东财，不发布坏数据。
+TV_SYMBOL = {"ndx": "NASDAQ:NDX", "csi500": "SSE:000905"}
+
+
+def _ws_recv_exact(sock, buf, n):
+    while len(buf) < n:
+        chunk = sock.recv(65536)
+        if not chunk:
+            raise RuntimeError("TradingView 连接中断")
+        buf += chunk
+    return buf[:n], buf[n:]
+
+
+def _ws_send_frame(sock, op, data):
+    mask = os.urandom(4)
+    ln = len(data)
+    if ln < 126:
+        head = bytes([0x80 | op, 0x80 | ln])
+    elif ln < 65536:
+        head = bytes([0x80 | op, 0x80 | 126]) + ln.to_bytes(2, "big")
+    else:
+        head = bytes([0x80 | op, 0x80 | 127]) + ln.to_bytes(8, "big")
+    masked = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+    sock.sendall(head + mask + masked)
+
+
+def _ws_read_message(sock, buf):
+    """读一条完整 WebSocket 消息（处理分片与 ping/pong），返回 (text, buf)。"""
+    payload = b""
+    while True:
+        head, buf = _ws_recv_exact(sock, buf, 2)
+        fin, op = head[0] & 0x80, head[0] & 0x0F
+        ln = head[1] & 0x7F
+        if ln == 126:
+            ext, buf = _ws_recv_exact(sock, buf, 2)
+            ln = int.from_bytes(ext, "big")
+        elif ln == 127:
+            ext, buf = _ws_recv_exact(sock, buf, 8)
+            ln = int.from_bytes(ext, "big")
+        data, buf = _ws_recv_exact(sock, buf, ln)
+        if op == 9:      # ping → pong
+            _ws_send_frame(sock, 10, data)
+            continue
+        if op == 8:
+            raise RuntimeError("TradingView 连接被关闭")
+        payload += data
+        if fin:
+            return payload.decode("utf-8", errors="replace"), buf
+
+
+def _tv_connect(host):
+    """连到 TradingView：环境里有 https_proxy 时先走 HTTP CONNECT 隧道
+    （本地补跑环境出口经代理，不走隧道会被明文响应打回、TLS 握手报
+    WRONG_VERSION_NUMBER；2026-11-23 本地首测实证），无代理时直连
+    （GitHub Actions 环境）。"""
+    import base64
+    import socket
+    import ssl
+    import urllib.parse
+
+    ctx = ssl.create_default_context()
+    proxy = (os.environ.get("https_proxy") or os.environ.get("HTTPS_PROXY")
+             or os.environ.get("all_proxy") or os.environ.get("ALL_PROXY") or "")
+    if proxy:
+        u = urllib.parse.urlparse(proxy)
+        raw = socket.create_connection((u.hostname, u.port or 3128), timeout=20)
+        auth = ""
+        if u.username:
+            cred = base64.b64encode(
+                f"{urllib.parse.unquote(u.username)}:"
+                f"{urllib.parse.unquote(u.password or '')}".encode()).decode()
+            auth = f"Proxy-Authorization: Basic {cred}\r\n"
+        raw.sendall(f"CONNECT {host}:443 HTTP/1.1\r\n"
+                    f"Host: {host}:443\r\n{auth}\r\n".encode())
+        resp = b""
+        while b"\r\n\r\n" not in resp:
+            chunk = raw.recv(4096)
+            if not chunk:
+                raise RuntimeError("代理 CONNECT 无响应")
+            resp += chunk
+        if b"200" not in resp.split(b"\r\n")[0]:
+            raise RuntimeError(f"代理 CONNECT 失败: {resp[:80]!r}")
+        return ctx.wrap_socket(raw, server_hostname=host)
+    return ctx.wrap_socket(socket.create_connection((host, 443), timeout=20),
+                           server_hostname=host)
+
+
+def tradingview_daily(symbol, min_bars):
+    """TradingView 日K → [(date, close)] 升序（一次取 1200 根）。"""
+    import base64
+    import re
+    import secrets
+    import socket
+    import string
+
+    host = "data.tradingview.com"
+    sock = _tv_connect(host)
+    sock.settimeout(20)
+    key = base64.b64encode(os.urandom(16)).decode()
+    sock.sendall((
+        "GET /socket.io/websocket HTTP/1.1\r\n"
+        f"Host: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+        f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
+        "Origin: https://data.tradingview.com\r\n"
+        "User-Agent: Mozilla/5.0\r\n\r\n").encode())
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = sock.recv(4096)
+        if not chunk:
+            raise RuntimeError("TradingView 握手无响应")
+        buf += chunk
+    head, _, buf = buf.partition(b"\r\n\r\n")
+    if b"101" not in head.split(b"\r\n")[0]:
+        raise RuntimeError(f"TradingView 握手失败: {head[:80]!r}")
+
+    def send(m, p):
+        msg = json.dumps({"m": m, "p": p}, separators=(",", ":"))
+        _ws_send_frame(sock, 1, f"~m~{len(msg)}~m~{msg}".encode())
+
+    cs = "cs_" + "".join(secrets.choice(string.ascii_lowercase) for _ in range(12))
+    send("set_auth_token", ["unauthorized_user_token"])
+    send("chart_create_session", [cs, ""])
+    send("resolve_symbol", [cs, "sds_sym_1",
+                            '={"symbol":"%s","adjustment":"splits"}' % symbol])
+    send("create_series", [cs, "sds_1", "s1", "sds_sym_1", "D", 1200, ""])
+
+    bars = {}
+    deadline = time.time() + 45
+    try:
+        while time.time() < deadline:
+            try:
+                text, buf = _ws_read_message(sock, buf)
+            except socket.timeout:
+                if len(bars) >= min_bars:
+                    break
+                raise RuntimeError("TradingView 读取超时")
+            done = False
+            for m in re.finditer(r"~m~(\d+)~m~", text):
+                part = text[m.end():m.end() + int(m.group(1))]
+                if part.startswith("~h~"):   # 应用层心跳，原样回送
+                    _ws_send_frame(sock, 1, f"~m~{len(part)}~m~{part}".encode())
+                    continue
+                try:
+                    obj = json.loads(part)
+                except Exception:
+                    continue
+                if obj.get("m") in ("timescale_update", "du"):
+                    try:
+                        for node in obj["p"][1].values():
+                            for e in node.get("s", []):
+                                v = e.get("v", [])
+                                if len(v) >= 5:
+                                    d = datetime.fromtimestamp(
+                                        int(v[0]), tz=timezone.utc).strftime("%Y-%m-%d")
+                                    bars[d] = float(v[4])
+                    except Exception:
+                        pass
+                elif obj.get("m") == "series_completed":
+                    done = True
+                elif obj.get("m") in ("critical_error", "symbol_error"):
+                    raise RuntimeError(f"TradingView 报错: {str(obj)[:120]}")
+            if done:
+                break
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+    out = sorted(bars.items())
+    if len(out) < min_bars:
+        raise RuntimeError(f"TradingView 日线数据不足: {symbol} 仅 {len(out)} 根")
+    return out
+
+
 def fetch_daily(key, secid):
-    """主源东财；整段失败时中证500 切腾讯、纳指切 Yahoo（打印留痕）。
-    黄金无等价备源，东财失败即原样报错。"""
+    """主源 TradingView（纳指/中证500）；失败退东财，东财再失败退第三
+    备源（中证500 腾讯、纳指 Yahoo），逐级打印留痕。黄金无 TV 覆盖，
+    仍东财单源、失败即原样报错。"""
+    sym = TV_SYMBOL.get(key)
+    if sym:
+        try:
+            return tradingview_daily(sym, 400)
+        except Exception as e:
+            print(f"WARN: {key} TradingView 主源失败（{e}），切换东方财富备源", file=sys.stderr)
     try:
         return eastmoney_daily(secid)
     except Exception as e:
@@ -325,7 +513,7 @@ def main():
         "updated_at_bj": now_bj.strftime("%Y-%m-%d %H:%M"),
         "total": TOTAL,
         "instruments": result,
-        "source": "东方财富日K（主源）+ 腾讯行情/东方财富实时通道（校验）",
+        "source": "TradingView 日K（纳指/中证500 主源）+ 东方财富日K（黄金主源/备源）+ 腾讯行情/东方财富实时通道（校验）",
         "note": "点位为最近已完成交易日收盘；30月均值为滚动口径；金额为最大余数法取整。",
     }
     os.makedirs(os.path.join(BASE, "data"), exist_ok=True)
