@@ -15,7 +15,7 @@
 
 校验：纳指100/中证500 最新收盘与腾讯行情核对（容差 0.6%）；
 上海金与东方财富实时通道昨收核对（0.6%）；COMEX 与上海金另加单日涨跌
-±3.5% 合理性检查。任一主源失败或校验不过 → 非零退出（工作流该步
+±6% 合理性检查（2026-11-23 由 ±3.5% 放宽，见 DAY_BAND 注释）。任一主源失败或校验不过 → 非零退出（工作流该步
 continue-on-error，保留上一版 returns.json，不发布坏数据）。
 
 备源（2026-11-19 加）：中证500 与三条基准的日K，东财整段失败时自动切
@@ -44,7 +44,11 @@ except Exception:
 BJ = timezone(timedelta(hours=8))
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOTAL_TOL = 0.006
-DAY_BAND = 0.035
+DAY_BAND = 0.06  # 黄金单日涨跌合理性带宽 ±6%（2026-11-23 由 ±3.5% 放宽：旧线系
+# 金价低波动期设定，本月 COMEX 已有 -3.22% 日跌幅、Au9999 11-20 真行情
+# 单日 -4.66%（801.93→764.55，COMEX 两日连跌约 -5% 佐证）撞穿旧线，致
+# 2026-11-23 主档/保底档抓数步双双被杀。最新 bar 另有昨收异通道 0.6%
+# 校验把关，此线只拦 10% 级离谱坏数据，与 fetch_data.py 同步同改）
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 SERIES = {
