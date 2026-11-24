@@ -1,56 +1,56 @@
 {
-  "updated_at_bj": "2026-11-23 11:38",
+  "updated_at_bj": "2026-11-24 08:41",
   "total": 3000,
   "instruments": {
     "ndx": {
       "name": "纳斯达克100",
       "unit": "点",
-      "point": 25028.98,
-      "point_date": "2026-11-20",
-      "mean30": 23774.12,
-      "samples": 630,
-      "prev_close": 26517.05,
-      "weight": 0.9499,
-      "alloc": 917,
+      "point": 26746.1,
+      "point_date": "2026-11-23",
+      "mean30": 23803.1,
+      "samples": 628,
+      "prev_close": 25028.98,
+      "weight": 0.89,
+      "alloc": 888,
       "check": {
         "source": "腾讯行情",
-        "ref_price": 25028.98,
+        "ref_price": 26746.1,
         "diff_pct": 0.0
       }
     },
     "csi500": {
       "name": "中证500",
       "unit": "点",
-      "point": 6006.08,
-      "point_date": "2026-11-20",
-      "mean30": 6622.43,
-      "samples": 610,
-      "prev_close": 6251.96,
-      "weight": 1.1026,
-      "alloc": 1064,
+      "point": 6128.99,
+      "point_date": "2026-11-23",
+      "mean30": 6627.21,
+      "samples": 608,
+      "prev_close": 6006.08,
+      "weight": 1.0813,
+      "alloc": 1080,
       "check": {
         "source": "腾讯行情",
-        "ref_price": 6006.08,
+        "ref_price": 6128.99,
         "diff_pct": 0.0
       }
     },
     "gold": {
       "name": "黄金（上海金 Au9999）",
       "unit": "元/克",
-      "point": 764.55,
-      "point_date": "2026-11-20",
-      "mean30": 806.61,
-      "samples": 610,
-      "prev_close": 801.93,
-      "weight": 1.055,
-      "alloc": 1019,
+      "point": 781.4,
+      "point_date": "2026-11-23",
+      "mean30": 807.73,
+      "samples": 608,
+      "prev_close": 764.55,
+      "weight": 1.0337,
+      "alloc": 1032,
       "check": {
         "source": "东方财富实时报价通道（昨收）",
-        "ref_price": 764.55,
+        "ref_price": 781.4,
         "diff_pct": 0.0
       }
     }
   },
-  "source": "东方财富日K（主源）+ 腾讯行情/东方财富实时通道（校验）",
+  "source": "TradingView 日K（纳指/中证500 主源）+ 东方财富日K（黄金主源/备源）+ 腾讯行情/东方财富实时通道（校验）",
   "note": "点位为最近已完成交易日收盘；30月均值为滚动口径；金额为最大余数法取整。"
 }
